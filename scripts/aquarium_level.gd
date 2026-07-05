@@ -159,6 +159,7 @@ var shop_panel: Panel
 var fish_buy_buttons: Array[Button] = []
 var upgrade_food_button: Button
 var buy_core_button: Button
+var core_hint_label: Label
 var pause_button: Button
 var restart_button: Button
 var menu_button: Button
@@ -263,9 +264,19 @@ func _draw() -> void:
 	_draw_enemies()
 	_draw_guard_effects()
 	_draw_hit_effects()
+	_draw_core_purchase_hint()
 	_draw_overlay_messages()
 	_draw_pause_overlay()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_core_purchase_hint() -> void:
+	if not _can_buy_core():
+		return
+	var pulse := (sin(Time.get_ticks_msec() / 170.0) + 1.0) * 0.5
+	var button_rect := Rect2(shop_panel.position + buy_core_button.position - Vector2(5 + pulse * 5, 5 + pulse * 5), buy_core_button.size + Vector2(10 + pulse * 10, 10 + pulse * 10))
+	draw_rect(button_rect, Color(1.0, 0.82, 0.22, 0.18 + pulse * 0.16), false, 3.0 + pulse * 2.0)
+	draw_circle(button_rect.get_center(), 28.0 + pulse * 12.0, Color(1.0, 0.78, 0.18, 0.08 + pulse * 0.08))
 
 
 func _load_chinese_font() -> void:
@@ -368,6 +379,15 @@ func _setup_shop_panel() -> void:
 	buy_core_button.size = Vector2(72, 42)
 	buy_core_button.pressed.connect(_on_buy_core_pressed)
 	shop_panel.add_child(buy_core_button)
+
+	core_hint_label = Label.new()
+	_apply_control_font(core_hint_label, 12)
+	core_hint_label.text = "可买"
+	core_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	core_hint_label.position = Vector2(374, 2)
+	core_hint_label.size = Vector2(72, 18)
+	core_hint_label.visible = false
+	shop_panel.add_child(core_hint_label)
 
 
 func _setup_main_menu() -> void:
@@ -1099,8 +1119,10 @@ func _update_ui() -> void:
 		fish_buy_buttons[fish_index].disabled = money < cost or paused or game_over or level_cleared
 	upgrade_food_button.disabled = money < _food_upgrade_cost() or food_level >= 3 or paused or game_over or level_cleared
 	upgrade_food_button.text = "食物\n$%d" % _food_upgrade_cost() if food_level < 3 else "满级"
-	buy_core_button.disabled = money < _core_cost() or cores >= 3 or paused or game_over or level_cleared
+	var core_affordable := _can_buy_core()
+	buy_core_button.disabled = not core_affordable
 	buy_core_button.text = "水晶\n$%d" % _core_cost()
+	_update_core_purchase_hint(core_affordable)
 	pause_button.disabled = game_over or level_cleared
 	pause_button.text = "继续" if paused else "暂停"
 	if level_cleared and current_level < MAX_LEVEL:
@@ -1114,6 +1136,23 @@ func _update_ui() -> void:
 
 func _food_upgrade_cost() -> int:
 	return 120 + food_level * 80
+
+
+func _can_buy_core() -> bool:
+	return money >= _core_cost() and cores < 3 and not paused and not game_over and not level_cleared
+
+
+func _update_core_purchase_hint(core_affordable: bool) -> void:
+	core_hint_label.visible = core_affordable
+	if core_affordable:
+		var pulse := (sin(Time.get_ticks_msec() / 180.0) + 1.0) * 0.5
+		buy_core_button.modulate = Color(1.0, 0.92 + pulse * 0.08, 0.42 + pulse * 0.28)
+		buy_core_button.scale = Vector2.ONE * (1.0 + pulse * 0.045)
+		core_hint_label.modulate = Color(1.0, 0.96, 0.55, 0.72 + pulse * 0.28)
+	else:
+		buy_core_button.modulate = Color.WHITE
+		buy_core_button.scale = Vector2.ONE
+		core_hint_label.modulate = Color.WHITE
 
 
 func _core_cost() -> int:
