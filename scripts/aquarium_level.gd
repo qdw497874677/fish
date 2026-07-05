@@ -204,6 +204,18 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+func _input(event: InputEvent) -> void:
+	if not _is_assist_click_key(event):
+		return
+	if in_menu or paused or game_over or level_cleared or shop_open:
+		return
+	var click_position := get_viewport().get_mouse_position()
+	if not PLAY_RECT.has_point(click_position):
+		return
+	_handle_assist_click(click_position)
+	get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if in_menu or paused or game_over or level_cleared:
 		return
@@ -219,13 +231,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventScreenTouch and event.pressed:
 		click_position = event.position
 		pressed = true
-	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
-			click_position = get_viewport().get_mouse_position()
-			pressed = true
 
 	if pressed:
 		_handle_assist_click(click_position)
+
+
+func _is_assist_click_key(event: InputEvent) -> bool:
+	if not event is InputEventKey:
+		return false
+	if not event.pressed or event.echo:
+		return false
+	return event.keycode == KEY_SPACE or event.keycode == KEY_ENTER
 
 
 func _handle_assist_click(click_position: Vector2) -> void:
@@ -548,6 +564,8 @@ func _setup_save_manager() -> void:
 func _apply_control_font(control: Control, font_size: int) -> void:
 	control.add_theme_font_override("font", chinese_font)
 	control.add_theme_font_size_override("font_size", font_size)
+	if control is Button:
+		control.focus_mode = Control.FOCUS_NONE
 
 
 func _start_level(level: int) -> void:
