@@ -158,8 +158,7 @@ var status_label: Label
 var shop_button: Button
 var shop_panel: Panel
 var shop_open := false
-var select_fish_button: Button
-var buy_fish_button: Button
+var fish_buy_buttons: Array[Button] = []
 var upgrade_food_button: Button
 var buy_core_button: Button
 var pause_button: Button
@@ -344,8 +343,8 @@ func _setup_ui() -> void:
 
 func _setup_shop_panel() -> void:
 	shop_panel = Panel.new()
-	shop_panel.position = Vector2(838, 108)
-	shop_panel.size = Vector2(410, 340)
+	shop_panel.position = Vector2(804, 108)
+	shop_panel.size = Vector2(444, 458)
 	shop_panel.visible = false
 	hud_layer.add_child(shop_panel)
 
@@ -359,41 +358,35 @@ func _setup_shop_panel() -> void:
 
 	var fish_note := Label.new()
 	_apply_control_font(fish_note, 17)
-	fish_note.text = "选择鱼种并购买"
+	fish_note.text = "直接点击商品购买"
 	fish_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fish_note.position = Vector2(0, 70)
 	fish_note.size = Vector2(shop_panel.size.x, 28)
 	shop_panel.add_child(fish_note)
 
-	select_fish_button = Button.new()
-	_apply_control_font(select_fish_button, 18)
-	select_fish_button.text = "鱼种"
-	select_fish_button.position = Vector2(40, 112)
-	select_fish_button.size = Vector2(154, 58)
-	select_fish_button.pressed.connect(_on_select_fish_pressed)
-	shop_panel.add_child(select_fish_button)
-
-	buy_fish_button = Button.new()
-	_apply_control_font(buy_fish_button, 18)
-	buy_fish_button.text = "购买鱼"
-	buy_fish_button.position = Vector2(216, 112)
-	buy_fish_button.size = Vector2(154, 58)
-	buy_fish_button.pressed.connect(_on_buy_fish_pressed)
-	shop_panel.add_child(buy_fish_button)
+	fish_buy_buttons.clear()
+	for fish_index in range(FISH_TYPES.size()):
+		var fish_button := Button.new()
+		_apply_control_font(fish_button, 16)
+		fish_button.position = Vector2(36, 108 + fish_index * 74)
+		fish_button.size = Vector2(372, 62)
+		fish_button.pressed.connect(_on_buy_fish_type_pressed.bind(fish_index))
+		fish_buy_buttons.append(fish_button)
+		shop_panel.add_child(fish_button)
 
 	upgrade_food_button = Button.new()
 	_apply_control_font(upgrade_food_button, 18)
 	upgrade_food_button.text = "升级食物 $200"
-	upgrade_food_button.position = Vector2(40, 194)
-	upgrade_food_button.size = Vector2(330, 56)
+	upgrade_food_button.position = Vector2(36, 342)
+	upgrade_food_button.size = Vector2(372, 48)
 	upgrade_food_button.pressed.connect(_on_upgrade_food_pressed)
 	shop_panel.add_child(upgrade_food_button)
 
 	buy_core_button = Button.new()
 	_apply_control_font(buy_core_button, 18)
 	buy_core_button.text = "购买水晶 $500"
-	buy_core_button.position = Vector2(40, 266)
-	buy_core_button.size = Vector2(330, 56)
+	buy_core_button.position = Vector2(36, 398)
+	buy_core_button.size = Vector2(372, 48)
 	buy_core_button.pressed.connect(_on_buy_core_pressed)
 	shop_panel.add_child(buy_core_button)
 
@@ -1122,15 +1115,16 @@ func _update_ui() -> void:
 	var no_fish_text := "  无鱼倒计时：%ds" % int(ceil(max(0.0, NO_FISH_GRACE_TIME - no_fish_timer))) if fish_list.is_empty() and not game_over and not level_cleared else ""
 	var wave_text := "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer)))
 	status_label.text = "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s" % [current_level, MAX_LEVEL, _get_level_config()["name"], cores, fish_list.size(), enemy_list.size(), helper_text, wave_text, no_fish_text]
-	var selected_fish := _selected_fish_config()
 	shop_button.text = "关闭" if shop_open else "商店"
-	select_fish_button.text = str(selected_fish["name"])
-	buy_fish_button.text = "购买 $%d" % int(selected_fish["cost"])
-	buy_fish_button.disabled = money < int(selected_fish["cost"]) or paused or game_over or level_cleared
+	for fish_index in range(fish_buy_buttons.size()):
+		var fish_config: Dictionary = FISH_TYPES[fish_index]
+		var cost := int(fish_config["cost"])
+		fish_buy_buttons[fish_index].text = "%s  $%d  ·  %s" % [str(fish_config["name"]), cost, _fish_shop_hint(fish_config)]
+		fish_buy_buttons[fish_index].disabled = money < cost or paused or game_over or level_cleared
 	upgrade_food_button.disabled = money < _food_upgrade_cost() or food_level >= 3 or paused or game_over or level_cleared
-	upgrade_food_button.text = "升级食物 $%d" % _food_upgrade_cost() if food_level < 3 else "食物已满级"
+	upgrade_food_button.text = "升级食物  $%d  ·  饱腹更久" % _food_upgrade_cost() if food_level < 3 else "食物已满级"
 	buy_core_button.disabled = money < _core_cost() or cores >= 3 or paused or game_over or level_cleared
-	buy_core_button.text = "购买水晶 $%d" % _core_cost()
+	buy_core_button.text = "购买水晶  $%d  ·  通关目标" % _core_cost()
 	pause_button.disabled = game_over or level_cleared
 	pause_button.text = "继续" if paused else "暂停"
 	if level_cleared and current_level < MAX_LEVEL:
@@ -1155,8 +1149,12 @@ func _get_level_config() -> Dictionary:
 	return LEVEL_CONFIGS.get(current_level, LEVEL_CONFIGS[1])
 
 
-func _selected_fish_config() -> Dictionary:
-	return FISH_TYPES[selected_fish_type_index]
+func _fish_shop_hint(fish_config: Dictionary) -> String:
+	if bool(fish_config.get("guard", false)):
+		return "自动防守"
+	if str(fish_config.get("id", "")) == "gold":
+		return "高收益"
+	return "均衡入门"
 
 
 func _fish_config(fish_type_id: String) -> Dictionary:
@@ -1342,20 +1340,21 @@ func _record_level_clear() -> void:
 	_save_progress()
 
 
-func _on_buy_fish_pressed() -> void:
-	var selected_fish := _selected_fish_config()
-	var cost := int(selected_fish["cost"])
+func _on_buy_fish_type_pressed(fish_index: int) -> void:
+	if fish_index < 0 or fish_index >= FISH_TYPES.size():
+		return
+	var fish_config: Dictionary = FISH_TYPES[fish_index]
+	var cost := int(fish_config["cost"])
 	if money < cost or game_over or level_cleared:
 		return
 	money -= cost
-	_spawn_fish(_random_play_position(), str(selected_fish["id"]))
+	_spawn_fish(_random_play_position(), str(fish_config["id"]))
 	run_fish_bought += 1
 	no_fish_timer = 0.0
 
 
-func _on_select_fish_pressed() -> void:
-	selected_fish_type_index = (selected_fish_type_index + 1) % FISH_TYPES.size()
-	_update_ui()
+func _on_buy_fish_pressed() -> void:
+	_on_buy_fish_type_pressed(selected_fish_type_index)
 
 
 func _on_upgrade_food_pressed() -> void:
