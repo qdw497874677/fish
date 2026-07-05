@@ -144,6 +144,7 @@ var back_to_menu_button: Button
 var level_buttons: Array[Button] = []
 var money_label: Label
 var status_label: Label
+var next_action_label: Label
 var shop_panel: Panel
 var fish_buy_buttons: Array[Button] = []
 var upgrade_food_button: Button
@@ -375,6 +376,11 @@ func _setup_ui() -> void:
 	status_label = AquariumUIFactory.label(chinese_font, 16, "")
 	status_label.clip_text = true
 	top_bar.add_child(status_label)
+
+	next_action_label = AquariumUIFactory.label(chinese_font, 17, "", Vector2(360, 102), Vector2(560, 30), HORIZONTAL_ALIGNMENT_CENTER)
+	next_action_label.clip_text = true
+	next_action_label.visible = false
+	hud_layer.add_child(next_action_label)
 
 	pause_button = AquariumUIFactory.button(chinese_font, 17, "暂停")
 	pause_button.pressed.connect(_on_pause_pressed)
@@ -633,6 +639,7 @@ func _start_level(level: int) -> void:
 func _show_main_menu() -> void:
 	_save_progress()
 	in_menu = true
+	next_action_label.visible = false
 	paused = false
 	game_over = false
 	level_cleared = false
@@ -1199,6 +1206,8 @@ func _update_ui() -> void:
 	var view_model := AquariumHUDPresenter.build_view_model(_hud_state(), GameData.FISH_TYPES, _get_level_config())
 	money_label.text = view_model["money_text"]
 	status_label.text = view_model["status_text"]
+	next_action_label.text = view_model["next_action_text"]
+	next_action_label.visible = not in_menu and str(view_model["next_action_text"]) != ""
 	var fish_button_states: Array = view_model["fish_buttons"]
 	for fish_index in range(min(fish_buy_buttons.size(), fish_button_states.size())):
 		var button_state: Dictionary = fish_button_states[fish_index]
@@ -1224,6 +1233,9 @@ func _hud_state() -> Dictionary:
 		"current_level": current_level,
 		"max_level": MAX_LEVEL,
 		"fish_count": fish_list.size(),
+		"food_count": food_list.size(),
+		"coin_count": coin_list.size(),
+		"hungry_fish_count": _hungry_fish_count(),
 		"enemy_count": enemy_list.size(),
 		"paused": paused,
 		"game_over": game_over,
@@ -1243,7 +1255,33 @@ func _hud_state() -> Dictionary:
 		"safe_reward_timer": safe_reward_timer,
 		"coin_combo_count": coin_combo_count,
 		"coin_combo_bonus_percent": ComboLogic.bonus_percent(coin_combo_count, COIN_COMBO_BONUS_PER_STEP, COIN_COMBO_MAX_MULTIPLIER),
+		"next_action_text": ProgressionLogic.next_action_hint(_raw_hint_state(), _get_level_config(), _minimum_fish_cost()),
 	}
+
+
+func _raw_hint_state() -> Dictionary:
+	return {
+		"money": money,
+		"cores": cores,
+		"fish_count": fish_list.size(),
+		"food_count": food_list.size(),
+		"coin_count": coin_list.size(),
+		"hungry_fish_count": _hungry_fish_count(),
+		"enemy_count": enemy_list.size(),
+		"core_cost": _core_cost(),
+		"pre_invasion_active": _is_pre_invasion_warning_active(),
+		"safe_reward_active": _is_safe_reward_active(),
+		"game_over": game_over,
+		"level_cleared": level_cleared,
+	}
+
+
+func _hungry_fish_count() -> int:
+	var count := 0
+	for fish in fish_list:
+		if float(fish.get("hunger", 0.0)) <= 45.0:
+			count += 1
+	return count
 
 
 func _food_upgrade_cost() -> int:
