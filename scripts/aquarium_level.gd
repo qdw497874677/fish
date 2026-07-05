@@ -885,15 +885,11 @@ func _update_fish(delta: float) -> void:
 			run_fish_lost += 1
 			continue
 
-		var target_food_index := _find_nearest_food_index(fish["pos"])
-		if target_food_index >= 0:
-			var target_food := food_list[target_food_index]
-			var direction: Vector2 = (target_food["pos"] - fish["pos"]).normalized()
-			fish["velocity"] = direction * 125.0
-			if fish["pos"].distance_to(target_food["pos"]) < FISH_RADIUS + FOOD_RADIUS:
-				fish["hunger"] = min(32.0, fish["hunger"] + 12.0 + target_food["nutrition"] * 4.0)
-				fish["growth"] = min(1.0, fish["growth"] + 0.21 * target_food["nutrition"] * fish_config["growth_multiplier"])
-				food_list.remove_at(target_food_index)
+		var guard_enemy_index := _guard_enemy_target_index(fish, fish_config)
+		if guard_enemy_index >= 0:
+			_update_guard_fish_movement(fish, guard_enemy_index)
+		elif _try_update_fish_feeding(fish, fish_config):
+			pass
 		else:
 			if fish["pos"].distance_to(fish["wander_target"]) < 24.0:
 				fish["wander_target"] = _random_play_position()
@@ -919,6 +915,42 @@ func _update_fish(delta: float) -> void:
 				fish["coin_timer"] = fish_config["coin_interval"]
 
 		fish_list[index] = fish
+
+
+func _try_update_fish_feeding(fish: Dictionary, fish_config: Dictionary) -> bool:
+	var target_food_index := _find_nearest_food_index(fish["pos"])
+	if target_food_index >= 0:
+		var target_food := food_list[target_food_index]
+		var direction: Vector2 = (target_food["pos"] - fish["pos"]).normalized()
+		fish["velocity"] = direction * 125.0
+		if fish["pos"].distance_to(target_food["pos"]) < FISH_RADIUS + FOOD_RADIUS:
+			fish["hunger"] = min(32.0, fish["hunger"] + 12.0 + target_food["nutrition"] * 4.0)
+			fish["growth"] = min(1.0, fish["growth"] + 0.21 * target_food["nutrition"] * fish_config["growth_multiplier"])
+			food_list.remove_at(target_food_index)
+		return true
+	return false
+
+
+func _guard_enemy_target_index(fish: Dictionary, fish_config: Dictionary) -> int:
+	if enemy_list.is_empty() or not bool(fish_config.get("guard", false)) or float(fish["growth"]) < 1.0:
+		return -1
+	return _find_nearest_enemy_index(fish["pos"], 999999.0)
+
+
+func _update_guard_fish_movement(fish: Dictionary, enemy_index: int) -> void:
+	var enemy_position: Vector2 = enemy_list[enemy_index]["pos"]
+	var to_enemy: Vector2 = enemy_position - fish["pos"]
+	var distance := to_enemy.length()
+	if distance <= 1.0:
+		fish["velocity"] = fish["velocity"].lerp(Vector2.ZERO, 0.12)
+		return
+	var direction := to_enemy / distance
+	var preferred_distance := GUARD_FISH_ATTACK_RANGE * 0.72
+	if distance > preferred_distance:
+		fish["velocity"] = fish["velocity"].lerp(direction * 118.0, 0.18)
+	else:
+		var orbit_direction := Vector2(-direction.y, direction.x)
+		fish["velocity"] = fish["velocity"].lerp(orbit_direction * 52.0, 0.1)
 
 
 func _update_guard_fish(delta: float) -> void:
