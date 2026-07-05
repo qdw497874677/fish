@@ -23,5 +23,13 @@ static func should_unlock_cleaner_snail(current_level: int, unlocked_cleaner_sna
 	return current_level == 1 and not unlocked_cleaner_snail
 
 
+static func should_unlock_bubble_seahorse(current_level: int, unlocked_bubble_seahorse: bool) -> bool:
+	return current_level == 2 and not unlocked_bubble_seahorse
+
+
+static func should_unlock_electric_jellyfish(current_level: int, max_level: int, unlocked_electric_jellyfish: bool) -> bool:
+	return current_level == max_level and not unlocked_electric_jellyfish
+
+
 static func should_clear_level(cores: int) -> bool:
 	return cores >= 3

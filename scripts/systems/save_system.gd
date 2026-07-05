@@ -10,6 +10,8 @@ static func empty_slot() -> Dictionary:
 		"name": "",
 		"highest_unlocked_level": 1,
 		"unlocked_cleaner_snail": false,
+		"unlocked_bubble_seahorse": false,
+		"unlocked_electric_jellyfish": false,
 		"cleared_levels": [],
 		"total_play_seconds": 0.0,
 	}
@@ -23,6 +25,8 @@ static func normalize_slot(raw_slot: Dictionary, max_level: int) -> Dictionary:
 		normalized["name"] = "未命名存档"
 	normalized["highest_unlocked_level"] = clamp(int(raw_slot.get("highest_unlocked_level", 1)), 1, max_level)
 	normalized["unlocked_cleaner_snail"] = bool(raw_slot.get("unlocked_cleaner_snail", false))
+	normalized["unlocked_bubble_seahorse"] = bool(raw_slot.get("unlocked_bubble_seahorse", false))
+	normalized["unlocked_electric_jellyfish"] = bool(raw_slot.get("unlocked_electric_jellyfish", false))
 	normalized["total_play_seconds"] = max(0.0, float(raw_slot.get("total_play_seconds", 0.0)))
 	var levels: Array[int] = []
 	var raw_levels: Variant = raw_slot.get("cleared_levels", [])

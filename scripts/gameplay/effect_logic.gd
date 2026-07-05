@@ -20,12 +20,25 @@ static func create_guard_effect(origin: Vector2, target: Vector2) -> Dictionary:
 	}
 
 
+static func create_jellyfish_effect(origin: Vector2, target: Vector2) -> Dictionary:
+	return {
+		"origin": origin,
+		"target": target,
+		"life": 0.34,
+		"max_life": 0.34,
+	}
+
+
 static func update_hit_effect(effect: Dictionary, delta: float) -> void:
 	effect["life"] = effect["life"] - delta
 	effect["pos"] = effect["pos"] + Vector2(0, -42.0 * delta)
 
 
 static func update_guard_effect(effect: Dictionary, delta: float) -> void:
+	effect["life"] = effect["life"] - delta
+
+
+static func update_jellyfish_effect(effect: Dictionary, delta: float) -> void:
 	effect["life"] = effect["life"] - delta
 
 
