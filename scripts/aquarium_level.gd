@@ -257,6 +257,7 @@ func _draw() -> void:
 		_draw_menu_atmosphere()
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
+	_draw_core_progress_slots()
 	_draw_food()
 	_draw_pets()
 	_draw_fish()
@@ -277,6 +278,58 @@ func _draw_core_purchase_hint() -> void:
 	var button_rect := Rect2(shop_panel.position + buy_core_button.position - Vector2(5 + pulse * 5, 5 + pulse * 5), buy_core_button.size + Vector2(10 + pulse * 10, 10 + pulse * 10))
 	draw_rect(button_rect, Color(1.0, 0.82, 0.22, 0.18 + pulse * 0.16), false, 3.0 + pulse * 2.0)
 	draw_circle(button_rect.get_center(), 28.0 + pulse * 12.0, Color(1.0, 0.78, 0.18, 0.08 + pulse * 0.08))
+
+
+func _draw_core_progress_slots() -> void:
+	var panel_rect := Rect2(Vector2(412, 638), Vector2(456, 58))
+	var pulse := (sin(Time.get_ticks_msec() / 210.0) + 1.0) * 0.5
+	draw_rect(panel_rect, Color("042f3f", 0.62), true)
+	draw_rect(panel_rect, Color("7dd3fc", 0.25), false, 2.0)
+	draw_string(chinese_font, Vector2(panel_rect.position.x + 16, panel_rect.position.y + 36), "水晶核心", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("e0f2fe"))
+	for index in range(3):
+		var slot_center := Vector2(panel_rect.position.x + 142 + index * 92, panel_rect.position.y + 29)
+		var slot_rect := Rect2(slot_center - Vector2(28, 22), Vector2(56, 44))
+		var purchased := index < cores
+		var next_slot := index == cores and cores < 3
+		var next_cost := _core_cost()
+		var near_ready := next_slot and money >= int(next_cost * 0.8)
+		var ready := next_slot and _can_buy_core()
+		var glow_alpha := 0.0
+		if purchased:
+			glow_alpha = 0.34
+		elif ready:
+			glow_alpha = 0.24 + pulse * 0.18
+		elif near_ready:
+			glow_alpha = 0.12 + pulse * 0.08
+		if glow_alpha > 0.0:
+			draw_circle(slot_center, 32.0 + pulse * 8.0, Color(0.99, 0.84, 0.28, glow_alpha))
+		draw_rect(slot_rect, Color("0f4558", 0.72), true)
+		draw_rect(slot_rect, Color("bae6fd", 0.35), false, 2.0)
+		_draw_core_diamond(slot_center, purchased, ready, near_ready)
+		if next_slot and not purchased:
+			draw_string(chinese_font, Vector2(slot_rect.position.x, slot_rect.position.y + 42), "$%d" % next_cost, HORIZONTAL_ALIGNMENT_CENTER, slot_rect.size.x, 13, Color("fef3c7" if near_ready else "bfdbfe"))
+
+
+func _draw_core_diamond(center: Vector2, purchased: bool, ready: bool, near_ready: bool) -> void:
+	var pulse := (sin(Time.get_ticks_msec() / 190.0) + 1.0) * 0.5
+	var radius := 13.0 + (pulse * 2.0 if ready else 0.0)
+	var points := PackedVector2Array([
+		center + Vector2(0, -radius),
+		center + Vector2(radius * 0.82, 0),
+		center + Vector2(0, radius),
+		center + Vector2(-radius * 0.82, 0),
+	])
+	var fill_color := Color("facc15") if purchased else Color("164e63")
+	if ready:
+		fill_color = Color(1.0, 0.86 + pulse * 0.12, 0.24)
+	elif near_ready:
+		fill_color = Color("fbbf24", 0.72)
+	var outline := PackedVector2Array([points[0], points[1], points[2], points[3], points[0]])
+	draw_polygon(points, [fill_color])
+	draw_polyline(outline, Color("fff7ed", 0.85 if purchased or ready else 0.42), 2.0)
+	if purchased or ready:
+		draw_line(center + Vector2(-5, 0), center + Vector2(0, 6), Color("fff7ed", 0.95), 2.0)
+		draw_line(center + Vector2(0, 6), center + Vector2(8, -7), Color("fff7ed", 0.95), 2.0)
 
 
 func _load_chinese_font() -> void:
