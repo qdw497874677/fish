@@ -40,6 +40,40 @@ http://127.0.0.1:8787/index.html
 godot --headless --path . --export-pack Web "build/web/godot.pck"
 ```
 
+## 当前脚本分层
+
+项目仍以 `scenes/aquarium_level.tscn` 作为主场景，但核心逻辑已开始从单脚本渐进拆分：
+
+后续开发必须遵守 `docs/development-guidelines.md` 中的分层、验证和 Web 导出规范。
+
+- `scripts/aquarium_level.gd`：关卡总控、主循环、输入、HUD/menu 连接、实体更新与绘制调度。
+- `scripts/data/game_data.gd`：关卡配置和鱼类型配置。
+- `scripts/systems/audio_system.gd`：运行时合成音效、背景氛围音、音效播放池和开关状态。
+- `scripts/systems/save_system.gd`：存档槽数据模型、归一化、槽位查找，以及 `user://aquarium_guard_save.json` 读写封装。
+- `scripts/gameplay/aquarium_queries.gd`：玩法层几何与最近目标查询工具，负责最近鱼/食物/敌人/金币索引、鱼群分离向量、随机水域位置和边界夹取。
+- `scripts/gameplay/fish_logic.gd`：鱼实体的纯逻辑工具，负责鱼字典创建、觅食局部更新、护卫鱼目标资格判断和护卫移动速度计算。
+- `scripts/gameplay/enemy_logic.gd`：敌人实体的纯逻辑工具，负责敌人字典创建、追鱼/漂移/偷金币移动、攻击与偷金币距离判断、攻击冷却重置。
+- `scripts/gameplay/resource_logic.gd`：资源实体的纯逻辑工具，负责食物/金币字典创建、下沉与生命周期判断、成熟鱼金币出生点、清洁螺目标选择和位移计算。
+- `scripts/gameplay/combat_logic.gd`：战斗规则工具，负责点击命中敌人、敌人扣血/击败判断，以及敌人金币奖励计算。
+- `scripts/gameplay/wave_logic.gd`：波次与防守状态工具，负责提示计时、刷怪计时、下一波随机间隔、入侵预警和防守压力状态判断。
+- `scripts/gameplay/effect_logic.gd`：视觉反馈数据工具，负责命中特效/护卫射线特效字典创建、生命周期更新和震屏参数。
+- `scripts/gameplay/economy_logic.gd`：经济规则工具，负责投喂/升级/水晶成本、购买条件和最低鱼价计算。
+- `scripts/gameplay/progression_logic.gd`：进度规则工具，负责无鱼失败倒计时、通关解锁下一关、清洁螺解锁和水晶通关判断。
+- `scripts/ui/aquarium_ui_factory.gd`：无状态 UI 控件工厂，统一创建 `Panel`、`Label`、`Button`、`LineEdit` 并应用中文字体和按钮焦点策略。
+- `scripts/ui/aquarium_hud_presenter.gd`：HUD 纯展示模型计算，负责金币/状态栏文案、购买按钮文案与禁用状态、暂停/重开按钮文案。
+
+每次继续拆分后，至少运行：
+
+```bash
+godot --headless --path . --quit-after 120
+```
+
+涉及 Web 包发布或脚本/场景最终验证时，再运行：
+
+```bash
+godot --headless --path . --export-pack Web "build/web/godot.pck"
+```
+
 ## Web 目录应包含
 
 ```text
@@ -163,6 +197,21 @@ HUD 会显示 `下一波：N秒`，用于提示下一次敌人入侵节奏。
 - 水体点击不会投喂、收金币或攻击敌人
 - 顶部按钮会切换为 `继续`
 - 可以点击 `菜单` 放弃当前局并返回关卡选择
+
+## 音频
+
+游戏顶部 HUD 右侧提供 `音效开` / `音效关` 按钮，会统一控制背景氛围音和所有操作音效。当前音频不依赖外部文件，而是在 Godot 运行时生成轻量合成音，避免增加 Web 包资源加载风险。
+
+当前已有音效反馈：
+
+- 投喂鱼食
+- 收集金币，包括清洁螺自动收集
+- 购买鱼、升级食物、购买水晶
+- 敌人入侵预警
+- 点击攻击、击败敌人、鱼被敌人吃掉
+- 通关和失败结算
+
+浏览器可能要求玩家先点击页面后才允许播放音频；如果首次进入菜单没有背景音，点击任意游戏按钮或切换一次 `音效开` 即可激活。
 
 ## 当前难度基准
 
