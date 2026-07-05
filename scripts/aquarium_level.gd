@@ -11,6 +11,7 @@ const FISH_SEPARATION_FORCE := 115.0
 const GUARD_FISH_ATTACK_RANGE := 180.0
 const GUARD_FISH_ATTACK_COOLDOWN := 2.4
 const NO_FISH_GRACE_TIME := 12.0
+const PRE_INVASION_WARNING_TIME := 2.0
 const MAX_LEVEL := 3
 const SAVE_SLOT_COUNT := 3
 const SAVE_PATH := "user://aquarium_guard_save.json"
@@ -266,6 +267,7 @@ func _draw() -> void:
 	_draw_guard_effects()
 	_draw_hit_effects()
 	_draw_core_purchase_hint()
+	_draw_pre_invasion_warning()
 	_draw_overlay_messages()
 	_draw_pause_overlay()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -278,6 +280,21 @@ func _draw_core_purchase_hint() -> void:
 	var button_rect := Rect2(shop_panel.position + buy_core_button.position - Vector2(5 + pulse * 5, 5 + pulse * 5), buy_core_button.size + Vector2(10 + pulse * 10, 10 + pulse * 10))
 	draw_rect(button_rect, Color(1.0, 0.82, 0.22, 0.18 + pulse * 0.16), false, 3.0 + pulse * 2.0)
 	draw_circle(button_rect.get_center(), 28.0 + pulse * 12.0, Color(1.0, 0.78, 0.18, 0.08 + pulse * 0.08))
+
+
+func _draw_pre_invasion_warning() -> void:
+	if not _is_pre_invasion_warning_active():
+		return
+	var remaining := int(ceil(max(0.0, enemy_spawn_timer)))
+	var pulse := (sin(Time.get_ticks_msec() / 95.0) + 1.0) * 0.5
+	var alpha := 0.18 + pulse * 0.18
+	draw_rect(PLAY_RECT, Color("fb7185", alpha), false, 5.0 + pulse * 3.0)
+	draw_rect(Rect2(PLAY_RECT.position, Vector2(18, PLAY_RECT.size.y)), Color("ef4444", 0.18 + pulse * 0.12), true)
+	draw_rect(Rect2(Vector2(PLAY_RECT.end.x - 18, PLAY_RECT.position.y), Vector2(18, PLAY_RECT.size.y)), Color("ef4444", 0.18 + pulse * 0.12), true)
+	var warning_rect := Rect2(Vector2(424, 116), Vector2(432, 66))
+	draw_rect(warning_rect, Color("450a0a", 0.72), true)
+	draw_rect(warning_rect, Color("fb7185", 0.72 + pulse * 0.24), false, 3.0)
+	draw_string(chinese_font, Vector2(warning_rect.position.x, warning_rect.position.y + 42), "入侵即将到来  %d" % remaining, HORIZONTAL_ALIGNMENT_CENTER, warning_rect.size.x, 28, Color("fff7ed"))
 
 
 func _draw_core_progress_slots() -> void:
@@ -1163,7 +1180,7 @@ func _update_ui() -> void:
 	money_label.text = "金币：%d  食物 Lv.%d  用时：%s" % [money, food_level, _format_time(total_play_seconds)]
 	var helper_text := "清洁螺：已解锁" if unlocked_cleaner_snail else "清洁螺：未解锁"
 	var no_fish_text := "  无鱼倒计时：%ds" % int(ceil(max(0.0, NO_FISH_GRACE_TIME - no_fish_timer))) if fish_list.is_empty() and not game_over and not level_cleared else ""
-	var wave_text := "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer)))
+	var wave_text := "  入侵预警：%ds" % int(ceil(max(0.0, enemy_spawn_timer))) if _is_pre_invasion_warning_active() else "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer)))
 	status_label.text = "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s" % [current_level, MAX_LEVEL, _get_level_config()["name"], cores, fish_list.size(), enemy_list.size(), helper_text, wave_text, no_fish_text]
 	for fish_index in range(fish_buy_buttons.size()):
 		var fish_config: Dictionary = FISH_TYPES[fish_index]
@@ -1193,6 +1210,10 @@ func _food_upgrade_cost() -> int:
 
 func _can_buy_core() -> bool:
 	return money >= _core_cost() and cores < 3 and not paused and not game_over and not level_cleared
+
+
+func _is_pre_invasion_warning_active() -> bool:
+	return enemy_spawn_timer > 0.0 and enemy_spawn_timer <= PRE_INVASION_WARNING_TIME and not game_over and not level_cleared
 
 
 func _update_core_purchase_hint(core_affordable: bool) -> void:
