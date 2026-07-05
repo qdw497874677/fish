@@ -64,6 +64,9 @@ static func create_coin(spawn_position: Vector2, value: int) -> Dictionary:
 		"value": value,
 		"speed": 55.0,
 		"life": 9.0,
+		"magnet_active": false,
+		"magnet_target": spawn_position,
+		"magnet_time": 0.0,
 	}
 
 
@@ -79,6 +82,45 @@ static func coin_spawn_position_for_fish(fish: Dictionary) -> Vector2:
 static func update_coin(coin: Dictionary, delta: float) -> void:
 	coin["pos"] = coin["pos"] + Vector2(0, coin["speed"] * delta)
 	coin["life"] = coin["life"] - delta
+
+
+static func can_start_player_magnet(coin: Dictionary, origin: Vector2, magnet_radius: float) -> bool:
+	if bool(coin.get("magnet_active", false)):
+		return false
+	return (coin.get("pos", origin) as Vector2).distance_to(origin) <= magnet_radius
+
+
+static func start_player_magnet(coin: Dictionary, target: Vector2, magnet_duration: float) -> void:
+	coin["magnet_active"] = true
+	coin["magnet_target"] = target
+	coin["magnet_time"] = magnet_duration
+
+
+static func update_magnetized_coin(coin: Dictionary, pull_speed: float, delta: float) -> void:
+	var position: Vector2 = coin["pos"]
+	var target: Vector2 = coin.get("magnet_target", position)
+	var to_target := target - position
+	if to_target.length() > 1.0:
+		coin["pos"] = position + to_target.normalized() * min(pull_speed * delta, to_target.length())
+	else:
+		coin["pos"] = target
+	coin["magnet_time"] = max(0.0, float(coin.get("magnet_time", 0.0)) - delta)
+	coin["life"] = coin["life"] - delta
+
+
+static func should_collect_magnetized_coin(coin: Dictionary, collect_radius: float) -> bool:
+	if not bool(coin.get("magnet_active", false)):
+		return false
+	var target: Vector2 = coin.get("magnet_target", coin["pos"])
+	return (coin["pos"] as Vector2).distance_to(target) <= collect_radius
+
+
+static func should_cancel_magnet(coin: Dictionary) -> bool:
+	return bool(coin.get("magnet_active", false)) and float(coin.get("magnet_time", 0.0)) <= 0.0
+
+
+static func cancel_magnet(coin: Dictionary) -> void:
+	coin["magnet_active"] = false
 
 
 static func should_collect_with_snail(coin: Dictionary, cleaner_snail_position: Vector2, collect_radius: float) -> bool:

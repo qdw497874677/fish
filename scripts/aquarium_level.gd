@@ -22,6 +22,10 @@ const FISH_RADIUS := 18.0
 const FOOD_RADIUS := 6.0
 const COIN_RADIUS := 11.0
 const COIN_SWEEP_RADIUS := 32.0
+const COIN_MAGNET_RADIUS := 104.0
+const COIN_MAGNET_PULL_SPEED := 420.0
+const COIN_MAGNET_COLLECT_RADIUS := 10.0
+const COIN_MAGNET_DURATION := 0.35
 const ENEMY_RADIUS := 24.0
 const FISH_SEPARATION_RADIUS := 58.0
 const FISH_SEPARATION_FORCE := 115.0
@@ -869,7 +873,17 @@ func _update_guard_fish(delta: float) -> void:
 func _update_coins(delta: float) -> void:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
-		ResourceLogic.update_coin(coin, delta)
+		if bool(coin.get("magnet_active", false)):
+			ResourceLogic.update_magnetized_coin(coin, COIN_MAGNET_PULL_SPEED, delta)
+			if ResourceLogic.should_collect_magnetized_coin(coin, COIN_MAGNET_COLLECT_RADIUS):
+				_collect_player_coin(coin)
+				coin_list.remove_at(index)
+				_play_sfx("coin")
+				continue
+			if ResourceLogic.should_cancel_magnet(coin):
+				ResourceLogic.cancel_magnet(coin)
+		else:
+			ResourceLogic.update_coin(coin, delta)
 		if unlocked_cleaner_snail and ResourceLogic.should_collect_with_snail(coin, cleaner_snail_position, CLEANER_SNAIL_COLLECT_RADIUS):
 			money += coin["value"]
 			coin_list.remove_at(index)
@@ -1030,7 +1044,7 @@ func _try_collect_coin(click_position: Vector2) -> bool:
 			coin_list.remove_at(index)
 			_play_sfx("coin")
 			return true
-	return false
+	return _try_start_coin_magnet(click_position)
 
 
 func _try_sweep_collect_coin(sweep_position: Vector2) -> bool:
@@ -1046,6 +1060,19 @@ func _try_sweep_collect_coin(sweep_position: Vector2) -> bool:
 	if collected:
 		_play_sfx("coin")
 	return collected
+
+
+func _try_start_coin_magnet(origin: Vector2) -> bool:
+	if not PLAY_RECT.has_point(origin):
+		return false
+	var started := false
+	for index in range(coin_list.size() - 1, -1, -1):
+		var coin := coin_list[index]
+		if ResourceLogic.can_start_player_magnet(coin, origin, COIN_MAGNET_RADIUS):
+			ResourceLogic.start_player_magnet(coin, origin, COIN_MAGNET_DURATION)
+			coin_list[index] = coin
+			started = true
+	return started
 
 
 func _try_attack_enemy(click_position: Vector2) -> bool:
