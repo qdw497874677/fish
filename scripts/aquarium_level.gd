@@ -12,6 +12,7 @@ const GUARD_FISH_ATTACK_RANGE := 180.0
 const GUARD_FISH_ATTACK_COOLDOWN := 2.4
 const NO_FISH_GRACE_TIME := 12.0
 const PRE_INVASION_WARNING_TIME := 2.0
+const DEFENSE_HUNGER_MULTIPLIER := 0.5
 const MAX_LEVEL := 3
 const SAVE_SLOT_COUNT := 3
 const SAVE_PATH := "user://aquarium_guard_save.json"
@@ -873,10 +874,11 @@ func _update_food(delta: float) -> void:
 
 
 func _update_fish(delta: float) -> void:
+	var hunger_delta := delta * _hunger_drain_multiplier()
 	for index in range(fish_list.size() - 1, -1, -1):
 		var fish := fish_list[index]
 		var fish_config := _fish_config(str(fish.get("type", "blue")))
-		fish["hunger"] = fish["hunger"] - delta
+		fish["hunger"] = fish["hunger"] - hunger_delta
 
 		if fish["hunger"] <= 0.0:
 			fish_list.remove_at(index)
@@ -1181,7 +1183,8 @@ func _update_ui() -> void:
 	var helper_text := "清洁螺：已解锁" if unlocked_cleaner_snail else "清洁螺：未解锁"
 	var no_fish_text := "  无鱼倒计时：%ds" % int(ceil(max(0.0, NO_FISH_GRACE_TIME - no_fish_timer))) if fish_list.is_empty() and not game_over and not level_cleared else ""
 	var wave_text := "  入侵预警：%ds" % int(ceil(max(0.0, enemy_spawn_timer))) if _is_pre_invasion_warning_active() else "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer)))
-	status_label.text = "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s" % [current_level, MAX_LEVEL, _get_level_config()["name"], cores, fish_list.size(), enemy_list.size(), helper_text, wave_text, no_fish_text]
+	var defense_text := "  防守期：饥饿减缓" if _is_defense_pressure_active() else ""
+	status_label.text = "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s%s" % [current_level, MAX_LEVEL, _get_level_config()["name"], cores, fish_list.size(), enemy_list.size(), helper_text, wave_text, defense_text, no_fish_text]
 	for fish_index in range(fish_buy_buttons.size()):
 		var fish_config: Dictionary = FISH_TYPES[fish_index]
 		var cost := int(fish_config["cost"])
@@ -1214,6 +1217,14 @@ func _can_buy_core() -> bool:
 
 func _is_pre_invasion_warning_active() -> bool:
 	return enemy_spawn_timer > 0.0 and enemy_spawn_timer <= PRE_INVASION_WARNING_TIME and not game_over and not level_cleared
+
+
+func _is_defense_pressure_active() -> bool:
+	return not enemy_list.is_empty() and not game_over and not level_cleared
+
+
+func _hunger_drain_multiplier() -> float:
+	return DEFENSE_HUNGER_MULTIPLIER if _is_defense_pressure_active() else 1.0
 
 
 func _update_core_purchase_hint(core_affordable: bool) -> void:
@@ -1792,6 +1803,7 @@ func _draw_overlay_messages() -> void:
 	if warning_time > 0.0:
 		var warning_text := "偷金币怪来了！保护金币" if last_enemy_type == "thief" else "入侵警报！点击敌人保护鱼群"
 		draw_string(chinese_font, Vector2(500, 135), warning_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color("ffdd57"))
+		draw_string(chinese_font, Vector2(510, 164), "防守期鱼饥饿减缓，先处理敌人", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("fed7aa"))
 	if pet_message_time > 0.0:
 		draw_string(chinese_font, Vector2(430, 175), "新助手解锁：清洁螺会自动捡起底部附近金币", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("e9d5ff"))
 	if fish_list.is_empty() and not game_over and not level_cleared:
