@@ -85,6 +85,10 @@ static func should_collect_with_snail(coin: Dictionary, cleaner_snail_position: 
 	return coin["pos"].distance_to(cleaner_snail_position) < collect_radius
 
 
+static func should_collect_coin_at(coin: Dictionary, collect_position: Vector2, collect_radius: float) -> bool:
+	return coin["pos"].distance_to(collect_position) <= collect_radius
+
+
 static func should_remove_coin(coin: Dictionary, play_rect: Rect2) -> bool:
 	return coin["pos"].y > play_rect.end.y - 8.0 or coin["life"] <= 0.0
 

@@ -20,6 +20,7 @@ const PLAY_RECT := Rect2(0, 96, 1280, 624)
 const FISH_RADIUS := 18.0
 const FOOD_RADIUS := 6.0
 const COIN_RADIUS := 11.0
+const COIN_SWEEP_RADIUS := 32.0
 const ENEMY_RADIUS := 24.0
 const FISH_SEPARATION_RADIUS := 58.0
 const FISH_SEPARATION_FORCE := 115.0
@@ -101,6 +102,7 @@ var run_money_earned := 0
 var run_fish_bought := 0
 var run_peak_fish_count := 0
 var audio_enabled := true
+var coin_sweep_active := false
 
 var fish_list: Array[Dictionary] = []
 var food_list: Array[Dictionary] = []
@@ -196,16 +198,25 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if in_menu or paused or game_over or level_cleared:
+		coin_sweep_active = false
 		return
 	var click_position := Vector2.ZERO
 	var pressed := false
 
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_position = event.position
-		pressed = true
-	elif event is InputEventScreenTouch and event.pressed:
-		click_position = event.position
-		pressed = true
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		coin_sweep_active = event.pressed
+		if event.pressed:
+			click_position = event.position
+			pressed = true
+	elif event is InputEventMouseMotion and coin_sweep_active:
+		_try_sweep_collect_coin(event.position)
+	elif event is InputEventScreenTouch:
+		coin_sweep_active = event.pressed
+		if event.pressed:
+			click_position = event.position
+			pressed = true
+	elif event is InputEventScreenDrag and coin_sweep_active:
+		_try_sweep_collect_coin(event.position)
 
 	if pressed:
 		_handle_assist_click(click_position)
@@ -1004,12 +1015,27 @@ func _update_jellyfish_effects(delta: float) -> void:
 func _try_collect_coin(click_position: Vector2) -> bool:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
-		if click_position.distance_to(coin["pos"]) <= COIN_RADIUS + 10.0:
+		if ResourceLogic.should_collect_coin_at(coin, click_position, COIN_RADIUS + 10.0):
 			money += coin["value"]
 			coin_list.remove_at(index)
 			_play_sfx("coin")
 			return true
 	return false
+
+
+func _try_sweep_collect_coin(sweep_position: Vector2) -> bool:
+	if not PLAY_RECT.has_point(sweep_position):
+		return false
+	var collected := false
+	for index in range(coin_list.size() - 1, -1, -1):
+		var coin := coin_list[index]
+		if ResourceLogic.should_collect_coin_at(coin, sweep_position, COIN_SWEEP_RADIUS):
+			money += coin["value"]
+			coin_list.remove_at(index)
+			collected = true
+	if collected:
+		_play_sfx("coin")
+	return collected
 
 
 func _try_attack_enemy(click_position: Vector2) -> bool:
