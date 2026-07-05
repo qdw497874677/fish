@@ -207,9 +207,8 @@ func _input(event: InputEvent) -> void:
 	if in_menu or paused or game_over or level_cleared:
 		return
 	var click_position := get_viewport().get_mouse_position()
-	if not PLAY_RECT.has_point(click_position):
-		return
-	_handle_assist_click(click_position)
+	if PLAY_RECT.has_point(click_position):
+		_handle_assist_click(click_position)
 	get_viewport().set_input_as_handled()
 
 
@@ -294,9 +293,10 @@ func _setup_ui() -> void:
 	top_bar.add_child(money_label)
 
 	status_label = Label.new()
-	_apply_control_font(status_label, 17)
+	_apply_control_font(status_label, 16)
 	status_label.position = Vector2(18, 52)
-	status_label.size = Vector2(520, 34)
+	status_label.size = Vector2(486, 34)
+	status_label.clip_text = true
 	top_bar.add_child(status_label)
 
 	pause_button = Button.new()
@@ -330,33 +330,25 @@ func _setup_ui() -> void:
 
 func _setup_shop_panel() -> void:
 	shop_panel = Panel.new()
-	shop_panel.position = Vector2(548, 10)
-	shop_panel.size = Vector2(458, 76)
+	shop_panel.position = Vector2(548, 14)
+	shop_panel.size = Vector2(458, 68)
 	shop_panel.visible = true
 	top_bar.add_child(shop_panel)
 
 	var title := Label.new()
-	_apply_control_font(title, 15)
+	_apply_control_font(title, 13)
 	title.text = "快捷购买"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	title.position = Vector2(12, 4)
-	title.size = Vector2(130, 24)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(8, 4)
+	title.size = Vector2(72, 20)
 	shop_panel.add_child(title)
-
-	var fish_note := Label.new()
-	_apply_control_font(fish_note, 13)
-	fish_note.text = "不遮挡鱼缸"
-	fish_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	fish_note.position = Vector2(330, 4)
-	fish_note.size = Vector2(116, 24)
-	shop_panel.add_child(fish_note)
 
 	fish_buy_buttons.clear()
 	for fish_index in range(FISH_TYPES.size()):
 		var fish_button := Button.new()
 		_apply_control_font(fish_button, 13)
-		fish_button.position = Vector2(12 + fish_index * 86, 30)
-		fish_button.size = Vector2(78, 36)
+		fish_button.position = Vector2(86 + fish_index * 70, 14)
+		fish_button.size = Vector2(64, 42)
 		fish_button.pressed.connect(_on_buy_fish_type_pressed.bind(fish_index))
 		fish_buy_buttons.append(fish_button)
 		shop_panel.add_child(fish_button)
@@ -364,16 +356,16 @@ func _setup_shop_panel() -> void:
 	upgrade_food_button = Button.new()
 	_apply_control_font(upgrade_food_button, 13)
 	upgrade_food_button.text = "升级食物 $200"
-	upgrade_food_button.position = Vector2(276, 30)
-	upgrade_food_button.size = Vector2(76, 36)
+	upgrade_food_button.position = Vector2(302, 14)
+	upgrade_food_button.size = Vector2(64, 42)
 	upgrade_food_button.pressed.connect(_on_upgrade_food_pressed)
 	shop_panel.add_child(upgrade_food_button)
 
 	buy_core_button = Button.new()
 	_apply_control_font(buy_core_button, 13)
 	buy_core_button.text = "购买水晶 $500"
-	buy_core_button.position = Vector2(360, 30)
-	buy_core_button.size = Vector2(86, 36)
+	buy_core_button.position = Vector2(374, 14)
+	buy_core_button.size = Vector2(72, 42)
 	buy_core_button.pressed.connect(_on_buy_core_pressed)
 	shop_panel.add_child(buy_core_button)
 
