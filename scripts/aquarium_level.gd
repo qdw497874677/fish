@@ -13,6 +13,7 @@ const CombatLogic := preload("res://scripts/gameplay/combat_logic.gd")
 const WaveLogic := preload("res://scripts/gameplay/wave_logic.gd")
 const EffectLogic := preload("res://scripts/gameplay/effect_logic.gd")
 const EconomyLogic := preload("res://scripts/gameplay/economy_logic.gd")
+const ComboLogic := preload("res://scripts/gameplay/combo_logic.gd")
 const ProgressionLogic := preload("res://scripts/gameplay/progression_logic.gd")
 
 const VIEWPORT_SIZE := Vector2(1280, 720)
@@ -31,6 +32,10 @@ const PRE_INVASION_WARNING_TIME := 2.0
 const DEFENSE_HUNGER_MULTIPLIER := 0.5
 const SAFE_REWARD_TIME := 3.0
 const SAFE_REWARD_COIN_MULTIPLIER := 1.2
+const COIN_COMBO_WINDOW := 1.6
+const COIN_COMBO_MAX := 8
+const COIN_COMBO_BONUS_PER_STEP := 0.05
+const COIN_COMBO_MAX_MULTIPLIER := 1.4
 const MAX_LEVEL := 3
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
@@ -103,6 +108,8 @@ var run_fish_bought := 0
 var run_peak_fish_count := 0
 var audio_enabled := true
 var coin_sweep_active := false
+var coin_combo_count := 0
+var coin_combo_timer := 0.0
 
 var fish_list: Array[Dictionary] = []
 var food_list: Array[Dictionary] = []
@@ -179,6 +186,7 @@ func _process(delta: float) -> void:
 	_update_guard_effects(delta)
 	_update_jellyfish_effects(delta)
 	_update_enemy_waves(delta)
+	_update_coin_combo(delta)
 	_update_play_time(delta)
 	_check_failure(delta)
 	_update_ui()
@@ -594,6 +602,7 @@ func _start_level(level: int) -> void:
 	last_pet_unlock_message = ""
 	enemy_spawn_timer = config["enemy_timer"]
 	safe_reward_timer = 0.0
+	_reset_coin_combo()
 	fish_list.clear()
 	food_list.clear()
 	coin_list.clear()
@@ -635,6 +644,7 @@ func _show_main_menu() -> void:
 	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 	last_pet_unlock_message = ""
 	safe_reward_timer = 0.0
+	_reset_coin_combo()
 	fish_list.clear()
 	food_list.clear()
 	coin_list.clear()
@@ -1016,7 +1026,7 @@ func _try_collect_coin(click_position: Vector2) -> bool:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
 		if ResourceLogic.should_collect_coin_at(coin, click_position, COIN_RADIUS + 10.0):
-			money += coin["value"]
+			_collect_player_coin(coin)
 			coin_list.remove_at(index)
 			_play_sfx("coin")
 			return true
@@ -1030,7 +1040,7 @@ func _try_sweep_collect_coin(sweep_position: Vector2) -> bool:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
 		if ResourceLogic.should_collect_coin_at(coin, sweep_position, COIN_SWEEP_RADIUS):
-			money += coin["value"]
+			_collect_player_coin(coin)
 			coin_list.remove_at(index)
 			collected = true
 	if collected:
@@ -1129,10 +1139,32 @@ func _check_failure(delta: float) -> void:
 		_save_progress()
 
 
+func _update_coin_combo(delta: float) -> void:
+	coin_combo_timer = ComboLogic.tick_combo_timer(coin_combo_timer, delta)
+	if ComboLogic.should_reset_streak(coin_combo_timer):
+		coin_combo_count = 0
+
+
+func _collect_player_coin(coin: Dictionary) -> void:
+	coin_combo_count = ComboLogic.advance_streak(coin_combo_count, COIN_COMBO_MAX)
+	coin_combo_timer = COIN_COMBO_WINDOW
+	var base_value := int(coin["value"])
+	var collected_value := ComboLogic.collected_coin_value(base_value, coin_combo_count, COIN_COMBO_BONUS_PER_STEP, COIN_COMBO_MAX_MULTIPLIER)
+	money += collected_value
+	if collected_value > base_value:
+		run_money_earned += collected_value - base_value
+
+
+func _reset_coin_combo() -> void:
+	coin_combo_count = 0
+	coin_combo_timer = 0.0
+
+
 func _trigger_game_over() -> void:
 	if game_over:
 		return
 	game_over = true
+	_reset_coin_combo()
 	_play_sfx("fail")
 
 
@@ -1182,6 +1214,8 @@ func _hud_state() -> Dictionary:
 		"defense_active": _is_defense_pressure_active(),
 		"safe_reward_active": _is_safe_reward_active(),
 		"safe_reward_timer": safe_reward_timer,
+		"coin_combo_count": coin_combo_count,
+		"coin_combo_bonus_percent": ComboLogic.bonus_percent(coin_combo_count, COIN_COMBO_BONUS_PER_STEP, COIN_COMBO_MAX_MULTIPLIER),
 	}
 
 

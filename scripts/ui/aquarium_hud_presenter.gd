@@ -22,6 +22,8 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 	var defense_active := bool(state["defense_active"])
 	var safe_reward_active := bool(state["safe_reward_active"])
 	var safe_reward_timer := float(state["safe_reward_timer"])
+	var coin_combo_count := int(state["coin_combo_count"])
+	var coin_combo_bonus_percent := int(state["coin_combo_bonus_percent"])
 	var unlocked_cleaner_snail := bool(state["unlocked_cleaner_snail"])
 	var unlocked_bubble_seahorse := bool(state["unlocked_bubble_seahorse"])
 	var unlocked_electric_jellyfish := bool(state["unlocked_electric_jellyfish"])
@@ -33,6 +35,7 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 	var wave_text := "  安全奖励：%ds" % int(ceil(max(0.0, safe_reward_timer))) if safe_reward_active else ("  入侵预警：%ds" % int(ceil(max(0.0, enemy_spawn_timer))) if pre_invasion_active else "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer))))
 	var defense_text := "  防守期：饥饿减缓" if defense_active else ""
 	var safe_reward_text := "  成熟鱼金币 +20%" if safe_reward_active else ""
+	var combo_text := "  收金币连击 x%d +%d%%" % [coin_combo_count, coin_combo_bonus_percent] if coin_combo_count >= 2 and coin_combo_bonus_percent > 0 else ""
 
 	var fish_buttons := []
 	for fish_config in fish_types:
@@ -44,7 +47,7 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 
 	return {
 		"money_text": "金币：%d  食物 Lv.%d  用时：%s" % [money, food_level, format_time(total_play_seconds)],
-		"status_text": "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s%s%s" % [current_level, max_level, level_config["name"], cores, fish_count, enemy_count, helper_text, wave_text, defense_text, safe_reward_text, no_fish_text],
+		"status_text": "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s%s%s%s" % [current_level, max_level, level_config["name"], cores, fish_count, enemy_count, helper_text, wave_text, defense_text, safe_reward_text, combo_text, no_fish_text],
 		"fish_buttons": fish_buttons,
 		"upgrade_food_disabled": money < food_upgrade_cost or food_level >= 3 or paused or game_over or level_cleared,
 		"upgrade_food_text": "食物\n$%d" % food_upgrade_cost if food_level < 3 else "满级",
