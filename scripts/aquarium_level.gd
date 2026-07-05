@@ -155,9 +155,7 @@ var back_to_menu_button: Button
 var level_buttons: Array[Button] = []
 var money_label: Label
 var status_label: Label
-var shop_button: Button
 var shop_panel: Panel
-var shop_open := false
 var fish_buy_buttons: Array[Button] = []
 var upgrade_food_button: Button
 var buy_core_button: Button
@@ -206,7 +204,7 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not _is_assist_click_key(event):
 		return
-	if in_menu or paused or game_over or level_cleared or shop_open:
+	if in_menu or paused or game_over or level_cleared:
 		return
 	var click_position := get_viewport().get_mouse_position()
 	if not PLAY_RECT.has_point(click_position):
@@ -218,9 +216,6 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if in_menu or paused or game_over or level_cleared:
 		return
-	if shop_open:
-		return
-
 	var click_position := Vector2.ZERO
 	var pressed := false
 
@@ -304,18 +299,10 @@ func _setup_ui() -> void:
 	status_label.size = Vector2(520, 34)
 	top_bar.add_child(status_label)
 
-	shop_button = Button.new()
-	_apply_control_font(shop_button, 18)
-	shop_button.text = "商店"
-	shop_button.position = Vector2(908, 20)
-	shop_button.size = Vector2(92, 56)
-	shop_button.pressed.connect(_on_shop_pressed)
-	top_bar.add_child(shop_button)
-
 	pause_button = Button.new()
 	_apply_control_font(pause_button, 17)
 	pause_button.text = "暂停"
-	pause_button.position = Vector2(1008, 20)
+	pause_button.position = Vector2(1018, 20)
 	pause_button.size = Vector2(86, 56)
 	pause_button.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(pause_button)
@@ -323,7 +310,7 @@ func _setup_ui() -> void:
 	restart_button = Button.new()
 	_apply_control_font(restart_button, 17)
 	restart_button.text = "重新开始"
-	restart_button.position = Vector2(1090, 20)
+	restart_button.position = Vector2(1108, 20)
 	restart_button.size = Vector2(102, 56)
 	restart_button.pressed.connect(_on_restart_pressed)
 	top_bar.add_child(restart_button)
@@ -331,7 +318,7 @@ func _setup_ui() -> void:
 	menu_button = Button.new()
 	_apply_control_font(menu_button, 17)
 	menu_button.text = "菜单"
-	menu_button.position = Vector2(1200, 20)
+	menu_button.position = Vector2(1212, 20)
 	menu_button.size = Vector2(72, 56)
 	menu_button.pressed.connect(_on_menu_pressed)
 	top_bar.add_child(menu_button)
@@ -343,50 +330,50 @@ func _setup_ui() -> void:
 
 func _setup_shop_panel() -> void:
 	shop_panel = Panel.new()
-	shop_panel.position = Vector2(804, 108)
-	shop_panel.size = Vector2(444, 458)
-	shop_panel.visible = false
-	hud_layer.add_child(shop_panel)
+	shop_panel.position = Vector2(548, 10)
+	shop_panel.size = Vector2(458, 76)
+	shop_panel.visible = true
+	top_bar.add_child(shop_panel)
 
 	var title := Label.new()
-	_apply_control_font(title, 28)
-	title.text = "商店"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 22)
-	title.size = Vector2(shop_panel.size.x, 40)
+	_apply_control_font(title, 15)
+	title.text = "快捷购买"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title.position = Vector2(12, 4)
+	title.size = Vector2(130, 24)
 	shop_panel.add_child(title)
 
 	var fish_note := Label.new()
-	_apply_control_font(fish_note, 17)
-	fish_note.text = "直接点击商品购买"
-	fish_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	fish_note.position = Vector2(0, 70)
-	fish_note.size = Vector2(shop_panel.size.x, 28)
+	_apply_control_font(fish_note, 13)
+	fish_note.text = "不遮挡鱼缸"
+	fish_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fish_note.position = Vector2(330, 4)
+	fish_note.size = Vector2(116, 24)
 	shop_panel.add_child(fish_note)
 
 	fish_buy_buttons.clear()
 	for fish_index in range(FISH_TYPES.size()):
 		var fish_button := Button.new()
-		_apply_control_font(fish_button, 16)
-		fish_button.position = Vector2(36, 108 + fish_index * 74)
-		fish_button.size = Vector2(372, 62)
+		_apply_control_font(fish_button, 13)
+		fish_button.position = Vector2(12 + fish_index * 86, 30)
+		fish_button.size = Vector2(78, 36)
 		fish_button.pressed.connect(_on_buy_fish_type_pressed.bind(fish_index))
 		fish_buy_buttons.append(fish_button)
 		shop_panel.add_child(fish_button)
 
 	upgrade_food_button = Button.new()
-	_apply_control_font(upgrade_food_button, 18)
+	_apply_control_font(upgrade_food_button, 13)
 	upgrade_food_button.text = "升级食物 $200"
-	upgrade_food_button.position = Vector2(36, 342)
-	upgrade_food_button.size = Vector2(372, 48)
+	upgrade_food_button.position = Vector2(276, 30)
+	upgrade_food_button.size = Vector2(76, 36)
 	upgrade_food_button.pressed.connect(_on_upgrade_food_pressed)
 	shop_panel.add_child(upgrade_food_button)
 
 	buy_core_button = Button.new()
-	_apply_control_font(buy_core_button, 18)
+	_apply_control_font(buy_core_button, 13)
 	buy_core_button.text = "购买水晶 $500"
-	buy_core_button.position = Vector2(36, 398)
-	buy_core_button.size = Vector2(372, 48)
+	buy_core_button.position = Vector2(360, 30)
+	buy_core_button.size = Vector2(86, 36)
 	buy_core_button.pressed.connect(_on_buy_core_pressed)
 	shop_panel.add_child(buy_core_button)
 
@@ -570,8 +557,7 @@ func _start_level(level: int) -> void:
 	menu_panel.visible = false
 	save_panel.visible = false
 	top_bar.visible = true
-	shop_open = false
-	shop_panel.visible = false
+	shop_panel.visible = true
 	current_level = level
 	var config := _get_level_config()
 	money = config["initial_money"]
@@ -629,7 +615,6 @@ func _show_main_menu() -> void:
 	top_bar.visible = false
 	menu_panel.visible = true
 	save_panel.visible = false
-	shop_open = false
 	shop_panel.visible = false
 	_update_menu_ui()
 	queue_redraw()
@@ -1115,16 +1100,15 @@ func _update_ui() -> void:
 	var no_fish_text := "  无鱼倒计时：%ds" % int(ceil(max(0.0, NO_FISH_GRACE_TIME - no_fish_timer))) if fish_list.is_empty() and not game_over and not level_cleared else ""
 	var wave_text := "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer)))
 	status_label.text = "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s" % [current_level, MAX_LEVEL, _get_level_config()["name"], cores, fish_list.size(), enemy_list.size(), helper_text, wave_text, no_fish_text]
-	shop_button.text = "关闭" if shop_open else "商店"
 	for fish_index in range(fish_buy_buttons.size()):
 		var fish_config: Dictionary = FISH_TYPES[fish_index]
 		var cost := int(fish_config["cost"])
-		fish_buy_buttons[fish_index].text = "%s  $%d  ·  %s" % [str(fish_config["name"]), cost, _fish_shop_hint(fish_config)]
+		fish_buy_buttons[fish_index].text = "%s\n$%d" % [_fish_shop_short_name(fish_config), cost]
 		fish_buy_buttons[fish_index].disabled = money < cost or paused or game_over or level_cleared
 	upgrade_food_button.disabled = money < _food_upgrade_cost() or food_level >= 3 or paused or game_over or level_cleared
-	upgrade_food_button.text = "升级食物  $%d  ·  饱腹更久" % _food_upgrade_cost() if food_level < 3 else "食物已满级"
+	upgrade_food_button.text = "食物\n$%d" % _food_upgrade_cost() if food_level < 3 else "满级"
 	buy_core_button.disabled = money < _core_cost() or cores >= 3 or paused or game_over or level_cleared
-	buy_core_button.text = "购买水晶  $%d  ·  通关目标" % _core_cost()
+	buy_core_button.text = "水晶\n$%d" % _core_cost()
 	pause_button.disabled = game_over or level_cleared
 	pause_button.text = "继续" if paused else "暂停"
 	if level_cleared and current_level < MAX_LEVEL:
@@ -1149,12 +1133,12 @@ func _get_level_config() -> Dictionary:
 	return LEVEL_CONFIGS.get(current_level, LEVEL_CONFIGS[1])
 
 
-func _fish_shop_hint(fish_config: Dictionary) -> String:
+func _fish_shop_short_name(fish_config: Dictionary) -> String:
 	if bool(fish_config.get("guard", false)):
-		return "自动防守"
+		return "护卫"
 	if str(fish_config.get("id", "")) == "gold":
-		return "高收益"
-	return "均衡入门"
+		return "金鱼"
+	return "蓝鱼"
 
 
 func _fish_config(fish_type_id: String) -> Dictionary:
@@ -1393,23 +1377,12 @@ func _on_pause_pressed() -> void:
 	if in_menu or game_over or level_cleared:
 		return
 	paused = not paused
-	if paused:
-		shop_open = false
-		shop_panel.visible = false
 	_update_ui()
 	queue_redraw()
 
 
 func _on_menu_pressed() -> void:
 	_show_main_menu()
-
-
-func _on_shop_pressed() -> void:
-	if in_menu or paused or game_over or level_cleared:
-		return
-	shop_open = not shop_open
-	shop_panel.visible = shop_open
-	_update_ui()
 
 
 func _on_continue_pressed() -> void:
