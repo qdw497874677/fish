@@ -28,11 +28,38 @@ const GUARD_FISH_ATTACK_COOLDOWN := 2.4
 const NO_FISH_GRACE_TIME := 12.0
 const PRE_INVASION_WARNING_TIME := 2.0
 const DEFENSE_HUNGER_MULTIPLIER := 0.5
+const SAFE_REWARD_TIME := 3.0
+const SAFE_REWARD_COIN_MULTIPLIER := 1.2
 const MAX_LEVEL := 3
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
 const CLEANER_SNAIL_SPEED := 185.0
 const CLEANER_SNAIL_COLLECT_RADIUS := 28.0
+const BUBBLE_SEAHORSE_HOME := Vector2(1188, 188)
+const BUBBLE_SEAHORSE_SPEED := 220.0
+const BUBBLE_SEAHORSE_FEED_RADIUS := 34.0
+const BUBBLE_SEAHORSE_FEED_INTERVAL := 6.5
+const BUBBLE_SEAHORSE_HUNGER_THRESHOLD := 55.0
+const BUBBLE_SEAHORSE_MAX_FOOD := 3
+const ELECTRIC_JELLYFISH_HOME := Vector2(656, 170)
+const ELECTRIC_JELLYFISH_ATTACK_INTERVAL := 3.6
+const ELECTRIC_JELLYFISH_ATTACK_RANGE := 720.0
+const ELECTRIC_JELLYFISH_DAMAGE := 1
+const HUD_HEIGHT := 96.0
+const HUD_MARGIN := 18.0
+const HUD_GAP := 16.0
+const HUD_ACTION_BUTTON_Y := 20.0
+const HUD_ACTION_BUTTON_HEIGHT := 56.0
+const HUD_ACTION_BUTTON_GAP := 4.0
+const HUD_ACTION_WIDTHS := [76.0, 78.0, 86.0, 66.0]
+const HUD_SHOP_WIDTH := 410.0
+const HUD_SHOP_HEIGHT := 68.0
+const HUD_SHOP_TITLE_WIDTH := 66.0
+const HUD_SHOP_FISH_BUTTON_WIDTH := 56.0
+const HUD_SHOP_FISH_BUTTON_GAP := 4.0
+const HUD_SHOP_RESOURCE_BUTTON_GAP := 8.0
+const HUD_SHOP_FOOD_BUTTON_WIDTH := 58.0
+const HUD_SHOP_CORE_BUTTON_WIDTH := 74.0
 
 var money := 180
 var food_level := 1
@@ -48,13 +75,22 @@ var last_enemy_type := "normal"
 var no_fish_timer := 0.0
 var goal_message_time := 0.0
 var enemy_spawn_timer := 12.0
+var safe_reward_timer := 0.0
 var unlocked_cleaner_snail := false
+var unlocked_bubble_seahorse := false
+var unlocked_electric_jellyfish := false
 var highest_unlocked_level := 1
 var cleared_levels: Array[int] = []
 var active_slot_index := -1
 var save_slots: Array[Dictionary] = []
 var cleaner_snail_position := CLEANER_SNAIL_HOME
+var bubble_seahorse_position := BUBBLE_SEAHORSE_HOME
+var bubble_seahorse_target := BUBBLE_SEAHORSE_HOME
+var bubble_seahorse_timer := BUBBLE_SEAHORSE_FEED_INTERVAL
+var bubble_seahorse_pending_feed := false
+var electric_jellyfish_timer := ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 var pet_message_time := 0.0
+var last_pet_unlock_message := ""
 var screen_shake_time := 0.0
 var screen_shake_strength := 0.0
 var total_play_seconds := 0.0
@@ -72,6 +108,7 @@ var coin_list: Array[Dictionary] = []
 var enemy_list: Array[Dictionary] = []
 var hit_effects: Array[Dictionary] = []
 var guard_effects: Array[Dictionary] = []
+var jellyfish_effects: Array[Dictionary] = []
 
 var chinese_font: Font
 var audio_system: AudioSystem
@@ -130,12 +167,15 @@ func _process(delta: float) -> void:
 
 	_update_food(delta)
 	_update_fish(delta)
+	_update_bubble_seahorse(delta)
 	_update_guard_fish(delta)
 	_update_cleaner_snail(delta)
 	_update_coins(delta)
 	_update_enemies(delta)
+	_update_electric_jellyfish(delta)
 	_update_hit_effects(delta)
 	_update_guard_effects(delta)
+	_update_jellyfish_effects(delta)
 	_update_enemy_waves(delta)
 	_update_play_time(delta)
 	_check_failure(delta)
@@ -205,6 +245,7 @@ func _draw() -> void:
 	_draw_coins()
 	_draw_enemies()
 	_draw_guard_effects()
+	_draw_jellyfish_effects()
 	_draw_hit_effects()
 	_draw_core_purchase_hint()
 	_draw_pre_invasion_warning()
@@ -302,62 +343,110 @@ func _setup_ui() -> void:
 	hud_layer = CanvasLayer.new()
 	add_child(hud_layer)
 
-	top_bar = AquariumUIFactory.panel(Vector2.ZERO, Vector2(VIEWPORT_SIZE.x, 96))
+	top_bar = AquariumUIFactory.panel(Vector2.ZERO, Vector2(VIEWPORT_SIZE.x, HUD_HEIGHT))
 	hud_layer.add_child(top_bar)
 
-	money_label = AquariumUIFactory.label(chinese_font, 18, "", Vector2(18, 18), Vector2(240, 28))
+	money_label = AquariumUIFactory.label(chinese_font, 18, "")
 	top_bar.add_child(money_label)
 
-	status_label = AquariumUIFactory.label(chinese_font, 16, "", Vector2(18, 52), Vector2(486, 34))
+	status_label = AquariumUIFactory.label(chinese_font, 16, "")
 	status_label.clip_text = true
 	top_bar.add_child(status_label)
 
-	pause_button = AquariumUIFactory.button(chinese_font, 17, "暂停", Vector2(966, 20), Vector2(76, 56))
+	pause_button = AquariumUIFactory.button(chinese_font, 17, "暂停")
 	pause_button.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(pause_button)
 
-	audio_button = AquariumUIFactory.button(chinese_font, 17, "音效", Vector2(1046, 20), Vector2(78, 56))
+	audio_button = AquariumUIFactory.button(chinese_font, 17, "音效")
 	audio_button.pressed.connect(_on_audio_toggle_pressed)
 	top_bar.add_child(audio_button)
 
-	restart_button = AquariumUIFactory.button(chinese_font, 17, "重新开始", Vector2(1128, 20), Vector2(86, 56))
+	restart_button = AquariumUIFactory.button(chinese_font, 17, "重新开始")
 	restart_button.pressed.connect(_on_restart_pressed)
 	top_bar.add_child(restart_button)
 
-	menu_button = AquariumUIFactory.button(chinese_font, 17, "菜单", Vector2(1218, 20), Vector2(66, 56))
+	menu_button = AquariumUIFactory.button(chinese_font, 17, "菜单")
 	menu_button.pressed.connect(_on_menu_pressed)
 	top_bar.add_child(menu_button)
 
 	_setup_shop_panel()
+	_layout_top_hud()
 
 	_setup_main_menu()
 
 
 func _setup_shop_panel() -> void:
-	shop_panel = AquariumUIFactory.panel(Vector2(548, 14), Vector2(458, 68), true)
+	shop_panel = AquariumUIFactory.panel(Vector2.ZERO, Vector2(HUD_SHOP_WIDTH, HUD_SHOP_HEIGHT), true)
 	top_bar.add_child(shop_panel)
 
-	var title := AquariumUIFactory.label(chinese_font, 13, "快捷购买", Vector2(8, 4), Vector2(72, 20), HORIZONTAL_ALIGNMENT_CENTER)
+	var title := AquariumUIFactory.label(chinese_font, 13, "快捷购买", Vector2(6, 4), Vector2(HUD_SHOP_TITLE_WIDTH, 20), HORIZONTAL_ALIGNMENT_CENTER)
 	shop_panel.add_child(title)
 
 	fish_buy_buttons.clear()
 	for fish_index in range(GameData.FISH_TYPES.size()):
-		var fish_button := AquariumUIFactory.button(chinese_font, 13, "", Vector2(86 + fish_index * 70, 14), Vector2(64, 42))
+		var fish_button := AquariumUIFactory.button(chinese_font, 13, "")
 		fish_button.pressed.connect(_on_buy_fish_type_pressed.bind(fish_index))
 		fish_buy_buttons.append(fish_button)
 		shop_panel.add_child(fish_button)
 
-	upgrade_food_button = AquariumUIFactory.button(chinese_font, 13, "升级食物 $200", Vector2(302, 14), Vector2(64, 42))
+	upgrade_food_button = AquariumUIFactory.button(chinese_font, 13, "升级食物 $200")
 	upgrade_food_button.pressed.connect(_on_upgrade_food_pressed)
 	shop_panel.add_child(upgrade_food_button)
 
-	buy_core_button = AquariumUIFactory.button(chinese_font, 13, "购买水晶 $500", Vector2(374, 14), Vector2(72, 42))
+	buy_core_button = AquariumUIFactory.button(chinese_font, 13, "购买水晶 $500")
 	buy_core_button.pressed.connect(_on_buy_core_pressed)
 	shop_panel.add_child(buy_core_button)
 
-	core_hint_label = AquariumUIFactory.label(chinese_font, 12, "可买", Vector2(374, 2), Vector2(72, 18), HORIZONTAL_ALIGNMENT_CENTER)
+	core_hint_label = AquariumUIFactory.label(chinese_font, 12, "可买", Vector2.ZERO, Vector2(HUD_SHOP_CORE_BUTTON_WIDTH, 18), HORIZONTAL_ALIGNMENT_CENTER)
 	core_hint_label.visible = false
 	shop_panel.add_child(core_hint_label)
+	_layout_shop_panel_contents()
+
+
+func _layout_top_hud() -> void:
+	var action_buttons := [pause_button, audio_button, restart_button, menu_button]
+	var action_width := _sum_float_array(HUD_ACTION_WIDTHS) + HUD_ACTION_BUTTON_GAP * float(action_buttons.size() - 1)
+	var action_x := VIEWPORT_SIZE.x - HUD_MARGIN - action_width
+	for index in range(action_buttons.size()):
+		var button: Button = action_buttons[index]
+		button.position = Vector2(action_x, HUD_ACTION_BUTTON_Y)
+		button.size = Vector2(HUD_ACTION_WIDTHS[index], HUD_ACTION_BUTTON_HEIGHT)
+		action_x += HUD_ACTION_WIDTHS[index] + HUD_ACTION_BUTTON_GAP
+
+	var action_left := VIEWPORT_SIZE.x - HUD_MARGIN - action_width
+	var shop_x := action_left - HUD_GAP - HUD_SHOP_WIDTH
+	shop_panel.position = Vector2(shop_x, (HUD_HEIGHT - HUD_SHOP_HEIGHT) * 0.5)
+	shop_panel.size = Vector2(HUD_SHOP_WIDTH, HUD_SHOP_HEIGHT)
+
+	money_label.position = Vector2(HUD_MARGIN, 18)
+	money_label.size = Vector2(shop_x - HUD_MARGIN - HUD_GAP, 28)
+	status_label.position = Vector2(HUD_MARGIN, 52)
+	status_label.size = Vector2(shop_x - HUD_MARGIN - HUD_GAP, 34)
+
+
+func _layout_shop_panel_contents() -> void:
+	var button_y := 14.0
+	var button_height := 42.0
+	var x := HUD_SHOP_TITLE_WIDTH + 8.0
+	for fish_button in fish_buy_buttons:
+		fish_button.position = Vector2(x, button_y)
+		fish_button.size = Vector2(HUD_SHOP_FISH_BUTTON_WIDTH, button_height)
+		x += HUD_SHOP_FISH_BUTTON_WIDTH + HUD_SHOP_FISH_BUTTON_GAP
+	x += HUD_SHOP_RESOURCE_BUTTON_GAP
+	upgrade_food_button.position = Vector2(x, button_y)
+	upgrade_food_button.size = Vector2(HUD_SHOP_FOOD_BUTTON_WIDTH, button_height)
+	x += HUD_SHOP_FOOD_BUTTON_WIDTH + HUD_SHOP_RESOURCE_BUTTON_GAP
+	buy_core_button.position = Vector2(x, button_y)
+	buy_core_button.size = Vector2(HUD_SHOP_CORE_BUTTON_WIDTH, button_height)
+	core_hint_label.position = Vector2(x, 2)
+	core_hint_label.size = Vector2(HUD_SHOP_CORE_BUTTON_WIDTH, 18)
+
+
+func _sum_float_array(values: Array) -> float:
+	var total := 0.0
+	for value in values:
+		total += float(value)
+	return total
 
 
 func _setup_main_menu() -> void:
@@ -486,13 +575,21 @@ func _start_level(level: int) -> void:
 	no_fish_timer = 0.0
 	goal_message_time = 5.0
 	pet_message_time = 0.0
+	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_pending_feed = false
+	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	last_pet_unlock_message = ""
 	enemy_spawn_timer = config["enemy_timer"]
+	safe_reward_timer = 0.0
 	fish_list.clear()
 	food_list.clear()
 	coin_list.clear()
 	enemy_list.clear()
 	hit_effects.clear()
 	guard_effects.clear()
+	jellyfish_effects.clear()
 	screen_shake_time = 0.0
 	screen_shake_strength = 0.0
 	run_play_seconds = 0.0
@@ -520,12 +617,20 @@ func _show_main_menu() -> void:
 	no_fish_timer = 0.0
 	goal_message_time = 0.0
 	pet_message_time = 0.0
+	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_pending_feed = false
+	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	last_pet_unlock_message = ""
+	safe_reward_timer = 0.0
 	fish_list.clear()
 	food_list.clear()
 	coin_list.clear()
 	enemy_list.clear()
 	hit_effects.clear()
 	guard_effects.clear()
+	jellyfish_effects.clear()
 	screen_shake_time = 0.0
 	screen_shake_strength = 0.0
 	top_bar.visible = false
@@ -547,7 +652,7 @@ func _update_menu_ui() -> void:
 		continue_button.text = "请先新建存档"
 		continue_button.disabled = true
 		current_save_label.text = "当前存档：未选择"
-	var helper_text := "清洁螺已解锁" if unlocked_cleaner_snail else "通关第 1 关解锁清洁螺"
+	var helper_text := _next_helper_unlock_text()
 	for index in range(level_buttons.size()):
 		var level := index + 1
 		var button := level_buttons[index]
@@ -556,7 +661,7 @@ func _update_menu_ui() -> void:
 		var clear_mark := " ✓" if cleared_levels.has(level) else ""
 		button.text = "第 %d 关%s\n%s" % [level, clear_mark, config["name"]]
 		button.disabled = not unlocked
-		button.tooltip_text = helper_text if level == 2 and not unlocked_cleaner_snail else ""
+		button.tooltip_text = helper_text if (level == 2 and not unlocked_cleaner_snail) or (level == 3 and not unlocked_bubble_seahorse) else ""
 
 
 func _show_save_manager() -> void:
@@ -575,17 +680,21 @@ func _update_save_manager(message := "") -> void:
 		var active_mark := "  当前" if slot_index == active_slot_index and exists else ""
 		if exists:
 			var snail_text := "已解锁" if bool(slot.get("unlocked_cleaner_snail", false)) else "未解锁"
+			var seahorse_text := "已解锁" if bool(slot.get("unlocked_bubble_seahorse", false)) else "未解锁"
+			var jellyfish_text := "已解锁" if bool(slot.get("unlocked_electric_jellyfish", false)) else "未解锁"
 			slot_name_labels[slot_index].text = "%s%s" % [str(slot.get("name", "未命名存档")), active_mark]
-			slot_progress_labels[slot_index].text = "最高：第 %d 关\n通关：%d / %d\n用时：%s\n清洁螺：%s" % [
+			slot_progress_labels[slot_index].text = "最高：第 %d 关\n通关：%d / %d\n用时：%s\n螺：%s 海马：%s 水母：%s" % [
 				int(slot.get("highest_unlocked_level", 1)),
 				_slot_cleared_count(slot),
 				MAX_LEVEL,
 				_format_time(float(slot.get("total_play_seconds", 0.0))),
 				snail_text,
+				seahorse_text,
+				jellyfish_text,
 			]
 		else:
 			slot_name_labels[slot_index].text = "空槽"
-			slot_progress_labels[slot_index].text = "等待新存档占用\n新存档从第 1 关开始\n清洁螺未解锁"
+			slot_progress_labels[slot_index].text = "等待新存档占用\n新存档从第 1 关开始\n助手未解锁"
 		slot_enter_buttons[slot_index].visible = exists
 		slot_delete_buttons[slot_index].visible = exists
 		slot_enter_buttons[slot_index].disabled = not exists
@@ -615,6 +724,11 @@ func _drop_food(drop_position: Vector2) -> void:
 	_play_sfx("feed")
 
 
+func _drop_auto_food(drop_position: Vector2) -> void:
+	food_list.append(ResourceLogic.create_food(_clamp_to_play_rect(drop_position, FOOD_RADIUS), max(1, food_level - 1)))
+	_play_sfx("feed")
+
+
 func _spawn_coin(spawn_position: Vector2, value: int) -> void:
 	coin_list.append(ResourceLogic.create_coin(_clamp_to_play_rect(spawn_position, COIN_RADIUS), value))
 	run_money_earned += value
@@ -632,6 +746,10 @@ func _spawn_hit_effect(position: Vector2, defeated: bool) -> void:
 
 func _spawn_guard_effect(origin: Vector2, target: Vector2) -> void:
 	guard_effects.append(EffectLogic.create_guard_effect(origin, target))
+
+
+func _spawn_jellyfish_effect(origin: Vector2, target: Vector2) -> void:
+	jellyfish_effects.append(EffectLogic.create_jellyfish_effect(origin, target))
 
 
 func _spawn_enemy() -> void:
@@ -692,7 +810,7 @@ func _update_fish(delta: float) -> void:
 		if fish["growth"] >= 1.0:
 			fish["coin_timer"] = fish["coin_timer"] - delta
 			if fish["coin_timer"] <= 0.0:
-				_spawn_coin(_coin_spawn_position_for_fish(fish), fish_config["coin_value"])
+				_spawn_coin(_coin_spawn_position_for_fish(fish), _safe_reward_coin_value(int(fish_config["coin_value"])))
 				fish["coin_timer"] = fish_config["coin_interval"]
 
 		fish_list[index] = fish
@@ -752,6 +870,53 @@ func _update_cleaner_snail(delta: float) -> void:
 	cleaner_snail_position = _clamp_to_play_rect(cleaner_snail_position, 22.0)
 
 
+func _update_bubble_seahorse(delta: float) -> void:
+	if not unlocked_bubble_seahorse:
+		bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
+		bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
+		bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+		bubble_seahorse_pending_feed = false
+		return
+
+	var target := bubble_seahorse_target if bubble_seahorse_pending_feed else BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_position = ResourceLogic.update_bubble_seahorse_position(bubble_seahorse_position, target, BUBBLE_SEAHORSE_SPEED, delta)
+	bubble_seahorse_position = _clamp_to_play_rect(bubble_seahorse_position, 24.0)
+
+	if bubble_seahorse_pending_feed:
+		if bubble_seahorse_position.distance_to(bubble_seahorse_target) > BUBBLE_SEAHORSE_FEED_RADIUS:
+			return
+		_drop_auto_food(bubble_seahorse_target)
+		bubble_seahorse_pending_feed = false
+		bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+		return
+
+	bubble_seahorse_timer = max(0.0, bubble_seahorse_timer - delta)
+	if bubble_seahorse_timer > 0.0:
+		return
+	if not ResourceLogic.should_auto_feed_with_seahorse(fish_list, food_list.size(), BUBBLE_SEAHORSE_MAX_FOOD, BUBBLE_SEAHORSE_HUNGER_THRESHOLD):
+		bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+		return
+	bubble_seahorse_target = _clamp_to_play_rect(ResourceLogic.bubble_seahorse_feed_position(fish_list, bubble_seahorse_position), FOOD_RADIUS)
+	bubble_seahorse_pending_feed = true
+
+
+func _update_electric_jellyfish(delta: float) -> void:
+	if not unlocked_electric_jellyfish:
+		electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+		return
+	if enemy_list.is_empty():
+		electric_jellyfish_timer = min(electric_jellyfish_timer, 0.8)
+		return
+	electric_jellyfish_timer = max(0.0, electric_jellyfish_timer - delta)
+	if electric_jellyfish_timer > 0.0:
+		return
+	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	var target_index := ResourceLogic.electric_jellyfish_target_index(ELECTRIC_JELLYFISH_HOME, enemy_list, ELECTRIC_JELLYFISH_ATTACK_RANGE)
+	if target_index < 0:
+		return
+	_electric_jellyfish_attack(target_index)
+
+
 func _update_enemies(delta: float) -> void:
 	for enemy_index in range(enemy_list.size() - 1, -1, -1):
 		var enemy := enemy_list[enemy_index]
@@ -792,6 +957,9 @@ func _update_enemy_waves(delta: float) -> void:
 	warning_time = WaveLogic.tick_timer(warning_time, delta)
 	pet_message_time = WaveLogic.tick_timer(pet_message_time, delta)
 	goal_message_time = WaveLogic.tick_timer(goal_message_time, delta)
+	safe_reward_timer = WaveLogic.tick_safe_reward_timer(safe_reward_timer, delta)
+	if _is_safe_reward_active():
+		return
 	enemy_spawn_timer = WaveLogic.tick_spawn_timer(enemy_spawn_timer, delta)
 	if WaveLogic.should_spawn_enemy(enemy_spawn_timer):
 		_spawn_enemy()
@@ -823,6 +991,16 @@ func _update_guard_effects(delta: float) -> void:
 			guard_effects[index] = effect
 
 
+func _update_jellyfish_effects(delta: float) -> void:
+	for index in range(jellyfish_effects.size() - 1, -1, -1):
+		var effect := jellyfish_effects[index]
+		EffectLogic.update_jellyfish_effect(effect, delta)
+		if EffectLogic.should_remove_effect(effect):
+			jellyfish_effects.remove_at(index)
+		else:
+			jellyfish_effects[index] = effect
+
+
 func _try_collect_coin(click_position: Vector2) -> bool:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
@@ -844,6 +1022,7 @@ func _try_attack_enemy(click_position: Vector2) -> bool:
 		_spawn_hit_effect(enemy["pos"], true)
 		_spawn_coin(enemy["pos"], _enemy_coin_reward(enemy))
 		enemy_list.remove_at(index)
+		_try_start_safe_reward_window()
 		_play_sfx("defeat")
 	else:
 		_spawn_hit_effect(enemy["pos"], false)
@@ -876,6 +1055,23 @@ func _guard_fish_attack(origin: Vector2, enemy_index: int) -> void:
 		_spawn_hit_effect(enemy["pos"], true)
 		_spawn_coin(enemy["pos"], _enemy_coin_reward(enemy))
 		enemy_list.remove_at(enemy_index)
+		_try_start_safe_reward_window()
+		_play_sfx("defeat")
+	else:
+		_spawn_hit_effect(enemy["pos"], false)
+		enemy_list[enemy_index] = enemy
+		_play_sfx("hit")
+
+
+func _electric_jellyfish_attack(enemy_index: int) -> void:
+	var enemy := enemy_list[enemy_index]
+	_spawn_jellyfish_effect(ELECTRIC_JELLYFISH_HOME, enemy["pos"])
+	if CombatLogic.apply_enemy_damage(enemy, ELECTRIC_JELLYFISH_DAMAGE):
+		run_enemies_defeated += 1
+		_spawn_hit_effect(enemy["pos"], true)
+		_spawn_coin(enemy["pos"], _enemy_coin_reward(enemy))
+		enemy_list.remove_at(enemy_index)
+		_try_start_safe_reward_window()
 		_play_sfx("defeat")
 	else:
 		_spawn_hit_effect(enemy["pos"], false)
@@ -948,6 +1144,8 @@ func _hud_state() -> Dictionary:
 		"game_over": game_over,
 		"level_cleared": level_cleared,
 		"unlocked_cleaner_snail": unlocked_cleaner_snail,
+		"unlocked_bubble_seahorse": unlocked_bubble_seahorse,
+		"unlocked_electric_jellyfish": unlocked_electric_jellyfish,
 		"enemy_spawn_timer": enemy_spawn_timer,
 		"no_fish_timer": no_fish_timer,
 		"no_fish_grace_time": NO_FISH_GRACE_TIME,
@@ -956,6 +1154,8 @@ func _hud_state() -> Dictionary:
 		"food_upgrade_cost": _food_upgrade_cost(),
 		"pre_invasion_active": _is_pre_invasion_warning_active(),
 		"defense_active": _is_defense_pressure_active(),
+		"safe_reward_active": _is_safe_reward_active(),
+		"safe_reward_timer": safe_reward_timer,
 	}
 
 
@@ -975,8 +1175,26 @@ func _is_defense_pressure_active() -> bool:
 	return WaveLogic.is_defense_pressure_active(enemy_list.size(), game_over, level_cleared)
 
 
+func _is_safe_reward_active() -> bool:
+	return WaveLogic.is_safe_reward_active(safe_reward_timer, game_over, level_cleared)
+
+
 func _hunger_drain_multiplier() -> float:
-	return DEFENSE_HUNGER_MULTIPLIER if _is_defense_pressure_active() else 1.0
+	return DEFENSE_HUNGER_MULTIPLIER if _is_defense_pressure_active() or _is_safe_reward_active() else 1.0
+
+
+func _safe_reward_coin_value(base_value: int) -> int:
+	if not _is_safe_reward_active():
+		return base_value
+	return int(ceil(float(base_value) * SAFE_REWARD_COIN_MULTIPLIER))
+
+
+func _try_start_safe_reward_window() -> void:
+	if not WaveLogic.should_start_safe_reward(enemy_list.size(), game_over, level_cleared):
+		return
+	safe_reward_timer = SAFE_REWARD_TIME
+	warning_time = 0.0
+	_play_sfx("coin")
 
 
 func _update_core_purchase_hint(core_affordable: bool) -> void:
@@ -1045,6 +1263,8 @@ func _load_progress() -> void:
 			"name": "旧存档",
 			"highest_unlocked_level": save_data.get("highest_unlocked_level", 1),
 			"unlocked_cleaner_snail": save_data.get("unlocked_cleaner_snail", false),
+			"unlocked_bubble_seahorse": save_data.get("unlocked_bubble_seahorse", false),
+			"unlocked_electric_jellyfish": save_data.get("unlocked_electric_jellyfish", false),
 			"cleared_levels": save_data.get("cleared_levels", []),
 			"total_play_seconds": save_data.get("total_play_seconds", 0.0),
 		})
@@ -1067,6 +1287,8 @@ func _save_progress() -> void:
 		return
 	slot["highest_unlocked_level"] = highest_unlocked_level
 	slot["unlocked_cleaner_snail"] = unlocked_cleaner_snail
+	slot["unlocked_bubble_seahorse"] = unlocked_bubble_seahorse
+	slot["unlocked_electric_jellyfish"] = unlocked_electric_jellyfish
 	slot["cleared_levels"] = cleared_levels.duplicate()
 	slot["total_play_seconds"] = total_play_seconds
 	save_slots[active_slot_index] = slot
@@ -1088,8 +1310,15 @@ func _normalize_slot(raw_slot: Dictionary) -> Dictionary:
 func _reset_runtime_progress() -> void:
 	highest_unlocked_level = 1
 	unlocked_cleaner_snail = false
+	unlocked_bubble_seahorse = false
+	unlocked_electric_jellyfish = false
 	cleared_levels.clear()
 	cleaner_snail_position = CLEANER_SNAIL_HOME
+	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_pending_feed = false
+	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 	total_play_seconds = 0.0
 	run_play_seconds = 0.0
 	no_fish_timer = 0.0
@@ -1099,6 +1328,8 @@ func _apply_slot_progress(slot_index: int) -> void:
 	var slot := save_slots[slot_index]
 	highest_unlocked_level = int(slot.get("highest_unlocked_level", 1))
 	unlocked_cleaner_snail = bool(slot.get("unlocked_cleaner_snail", false))
+	unlocked_bubble_seahorse = bool(slot.get("unlocked_bubble_seahorse", false))
+	unlocked_electric_jellyfish = bool(slot.get("unlocked_electric_jellyfish", false))
 	total_play_seconds = float(slot.get("total_play_seconds", 0.0))
 	run_play_seconds = 0.0
 	no_fish_timer = 0.0
@@ -1110,6 +1341,21 @@ func _apply_slot_progress(slot_index: int) -> void:
 			if not cleared_levels.has(level):
 				cleared_levels.append(level)
 	cleaner_snail_position = CLEANER_SNAIL_HOME
+	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
+	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_pending_feed = false
+	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+
+
+func _next_helper_unlock_text() -> String:
+	if not unlocked_cleaner_snail:
+		return "通关第 1 关解锁清洁螺"
+	if not unlocked_bubble_seahorse:
+		return "通关第 2 关解锁泡泡海马"
+	if not unlocked_electric_jellyfish:
+		return "通关第 3 关解锁电光水母"
+	return "清洁螺、泡泡海马与电光水母已解锁"
 
 
 func _first_existing_slot_index() -> int:
@@ -1165,6 +1411,20 @@ func _on_buy_core_pressed() -> void:
 		if ProgressionLogic.should_unlock_cleaner_snail(current_level, unlocked_cleaner_snail):
 			unlocked_cleaner_snail = true
 			pet_message_time = 6.0
+			last_pet_unlock_message = "新助手解锁：清洁螺会自动捡起底部附近金币"
+		if ProgressionLogic.should_unlock_bubble_seahorse(current_level, unlocked_bubble_seahorse):
+			unlocked_bubble_seahorse = true
+			bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
+			bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
+			bubble_seahorse_timer = 1.2
+			bubble_seahorse_pending_feed = false
+			pet_message_time = 6.0
+			last_pet_unlock_message = "新助手解锁：泡泡海马会自动给饥饿鱼投喂"
+		if ProgressionLogic.should_unlock_electric_jellyfish(current_level, MAX_LEVEL, unlocked_electric_jellyfish):
+			unlocked_electric_jellyfish = true
+			electric_jellyfish_timer = 1.2
+			pet_message_time = 6.0
+			last_pet_unlock_message = "新助手解锁：电光水母会自动电击入侵敌人"
 		_record_level_clear()
 		level_cleared = true
 		_play_sfx("clear")
@@ -1387,9 +1647,16 @@ func _draw_coins() -> void:
 
 
 func _draw_pets() -> void:
-	if not unlocked_cleaner_snail:
-		return
 	var t := Time.get_ticks_msec() / 1000.0
+	if unlocked_cleaner_snail:
+		_draw_cleaner_snail(t)
+	if unlocked_bubble_seahorse:
+		_draw_bubble_seahorse(t)
+	if unlocked_electric_jellyfish:
+		_draw_electric_jellyfish(t)
+
+
+func _draw_cleaner_snail(t: float) -> void:
 	var bob := sin(t * 5.0) * 2.0
 	var crawl := sin(t * 8.0) * 3.0
 	var base := cleaner_snail_position + Vector2(0, bob)
@@ -1407,6 +1674,46 @@ func _draw_pets() -> void:
 	draw_circle(base + Vector2(36 - crawl, -28), 2.5, Color("f5f3ff"))
 	draw_line(base + Vector2(-20, 16), base + Vector2(-28 + crawl, 22), Color("ddd6fe", 0.75), 2.0)
 	draw_line(base + Vector2(8, 16), base + Vector2(16 - crawl, 22), Color("ddd6fe", 0.75), 2.0)
+
+
+func _draw_bubble_seahorse(t: float) -> void:
+	var bob := sin(t * 3.2) * 6.0
+	var tail := sin(t * 6.0) * 4.0
+	var base := bubble_seahorse_position + Vector2(0, bob)
+	if bubble_seahorse_pending_feed:
+		draw_line(base + Vector2(-18, -24), bubble_seahorse_target, Color("bae6fd", 0.2), 2.0)
+		draw_circle(bubble_seahorse_target, 13.0 + sin(t * 8.0) * 3.0, Color("e0f2fe", 0.18))
+	_draw_ellipse_poly(base + Vector2(2, 22), Vector2(24, 7), Color("075985", 0.24))
+	_draw_ellipse_poly(base, Vector2(18, 31), Color("38bdf8"))
+	_draw_ellipse_poly(base + Vector2(-2, -2), Vector2(11, 23), Color("bae6fd", 0.72))
+	draw_circle(base + Vector2(-8, -28), 15.0, Color("67e8f9"))
+	draw_circle(base + Vector2(-13, -31), 2.4, Color("083344"))
+	draw_line(base + Vector2(-19, -24), base + Vector2(-34, -20 + tail), Color("22d3ee"), 5.0)
+	draw_arc(base + Vector2(2, 26), 16.0, 0.25, TAU * 0.86, 24, Color("0e7490"), 4.0)
+	draw_polygon(PackedVector2Array([base + Vector2(12, -6), base + Vector2(32, -18 + tail), base + Vector2(24, 6 + tail)]), [Color("0891b2")])
+	for index in range(3):
+		var bubble_offset := Vector2(-34.0 - float(index) * 14.0, -38.0 - float(index) * 18.0 + sin(t * 4.0 + index) * 5.0)
+		draw_circle(base + bubble_offset, 5.0 + float(index), Color("e0f2fe", 0.28))
+
+
+func _draw_electric_jellyfish(t: float) -> void:
+	var bob := sin(t * 2.6) * 7.0
+	var pulse := 0.5 + sin(t * 5.0) * 0.5
+	var base := ELECTRIC_JELLYFISH_HOME + Vector2(0, bob)
+	draw_circle(base, 38.0 + pulse * 6.0, Color("a5f3fc", 0.08 + pulse * 0.06))
+	_draw_ellipse_poly(base, Vector2(30, 22), Color("67e8f9", 0.78))
+	_draw_ellipse_poly(base + Vector2(-4, -4), Vector2(20, 14), Color("ecfeff", 0.45))
+	draw_arc(base + Vector2(0, 3), 28.0, 0.05, TAU * 0.48, 18, Color("0891b2", 0.8), 3.0)
+	for index in range(5):
+		var x_offset := -22.0 + float(index) * 11.0
+		var wave := sin(t * 6.0 + float(index)) * 6.0
+		var start := base + Vector2(x_offset, 16)
+		var middle := base + Vector2(x_offset + wave, 36)
+		var end := base + Vector2(x_offset - wave * 0.5, 54 + sin(t * 4.0 + index) * 5.0)
+		draw_line(start, middle, Color("cffafe", 0.72), 2.0)
+		draw_line(middle, end, Color("22d3ee", 0.62), 2.0)
+	draw_circle(base + Vector2(-9, -2), 2.2, Color("164e63"))
+	draw_circle(base + Vector2(9, -2), 2.2, Color("164e63"))
 
 
 func _draw_ellipse_poly(center: Vector2, radii: Vector2, color: Color) -> void:
@@ -1474,6 +1781,22 @@ func _draw_guard_effects() -> void:
 		draw_circle(target, 12.0 * alpha, Color("6ee7b7", 0.5 * alpha))
 
 
+func _draw_jellyfish_effects() -> void:
+	for effect in jellyfish_effects:
+		var origin: Vector2 = effect["origin"]
+		var target: Vector2 = effect["target"]
+		var max_life: float = effect["max_life"]
+		var life: float = effect["life"]
+		var alpha: float = clamp(life / max_life, 0.0, 1.0)
+		var direction := target - origin
+		var normal := Vector2(-direction.y, direction.x).normalized() if direction.length() > 0.1 else Vector2.UP
+		var mid := origin.lerp(target, 0.52) + normal * sin(Time.get_ticks_msec() / 45.0) * 18.0
+		draw_line(origin, mid, Color("22d3ee", alpha), 5.0)
+		draw_line(mid, target, Color("a5f3fc", alpha), 5.0)
+		draw_line(origin, target, Color("ecfeff", alpha * 0.68), 2.0)
+		draw_circle(target, 17.0 * alpha, Color("67e8f9", 0.38 * alpha))
+
+
 func _draw_hit_effects() -> void:
 	for effect in hit_effects:
 		var position: Vector2 = effect["pos"]
@@ -1512,8 +1835,14 @@ func _draw_overlay_messages() -> void:
 		var warning_text := "偷金币怪来了！保护金币" if last_enemy_type == "thief" else "入侵警报！点击敌人保护鱼群"
 		draw_string(chinese_font, Vector2(500, 135), warning_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color("ffdd57"))
 		draw_string(chinese_font, Vector2(510, 164), "防守期鱼饥饿减缓，先处理敌人", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("fed7aa"))
+	if _is_safe_reward_active():
+		var remaining := int(ceil(max(0.0, safe_reward_timer)))
+		draw_rect(Rect2(Vector2(400, 132), Vector2(480, 72)), Color("064e3b", 0.68), true)
+		draw_rect(Rect2(Vector2(400, 132), Vector2(480, 72)), Color("86efac", 0.72), false, 3.0)
+		draw_string(chinese_font, Vector2(430, 174), "防守成功！安全奖励 %d 秒" % remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 27, Color("dcfce7"))
+		draw_string(chinese_font, Vector2(438, 198), "成熟鱼金币 +20%，下一波暂停倒计时", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("bbf7d0"))
 	if pet_message_time > 0.0:
-		draw_string(chinese_font, Vector2(430, 175), "新助手解锁：清洁螺会自动捡起底部附近金币", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("e9d5ff"))
+		draw_string(chinese_font, Vector2(430, 175), last_pet_unlock_message, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("e9d5ff"))
 	if fish_list.is_empty() and not game_over and not level_cleared:
 		var remaining := int(ceil(max(0.0, NO_FISH_GRACE_TIME - no_fish_timer)))
 		draw_rect(Rect2(Vector2(396, 198), Vector2(488, 96)), Color("3b0a0a", 0.74), true)
