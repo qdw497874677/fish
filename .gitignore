@@ -1,0 +1,5 @@
+.godot/
+.playwright-mcp/
+.DS_Store
+*.tmp
+*.log
