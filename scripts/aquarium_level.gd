@@ -40,6 +40,7 @@ const COIN_COMBO_WINDOW := 1.6
 const COIN_COMBO_MAX := 8
 const COIN_COMBO_BONUS_PER_STEP := 0.05
 const COIN_COMBO_MAX_MULTIPLIER := 1.4
+const MOBILE_TOUCH_HINT_TIME := 6.0
 const MAX_LEVEL := 3
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
@@ -114,6 +115,8 @@ var audio_enabled := true
 var coin_sweep_active := false
 var coin_combo_count := 0
 var coin_combo_timer := 0.0
+var mobile_touch_hint_seen := false
+var mobile_touch_hint_time := 0.0
 
 var fish_list: Array[Dictionary] = []
 var food_list: Array[Dictionary] = []
@@ -226,9 +229,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventScreenTouch:
 		coin_sweep_active = event.pressed
 		if event.pressed:
+			_show_mobile_touch_hint_once()
 			click_position = event.position
 			pressed = true
 	elif event is InputEventScreenDrag and coin_sweep_active:
+		_show_mobile_touch_hint_once()
 		_try_sweep_collect_coin(event.position)
 
 	if pressed:
@@ -241,6 +246,13 @@ func _is_assist_click_key(event: InputEvent) -> bool:
 	if not event.pressed or event.echo:
 		return false
 	return event.keycode == KEY_SPACE or event.keycode == KEY_ENTER
+
+
+func _show_mobile_touch_hint_once() -> void:
+	if mobile_touch_hint_seen:
+		return
+	mobile_touch_hint_seen = true
+	mobile_touch_hint_time = MOBILE_TOUCH_HINT_TIME
 
 
 func _handle_assist_click(click_position: Vector2) -> void:
@@ -273,6 +285,7 @@ func _draw() -> void:
 	_draw_hit_effects()
 	_draw_core_purchase_hint()
 	_draw_pre_invasion_warning()
+	_draw_mobile_touch_guidance()
 	_draw_overlay_messages()
 	_draw_pause_overlay()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -300,6 +313,19 @@ func _draw_pre_invasion_warning() -> void:
 	draw_rect(warning_rect, Color("450a0a", 0.72), true)
 	draw_rect(warning_rect, Color("fb7185", 0.72 + pulse * 0.24), false, 3.0)
 	draw_string(chinese_font, Vector2(warning_rect.position.x, warning_rect.position.y + 42), "入侵即将到来  %d" % remaining, HORIZONTAL_ALIGNMENT_CENTER, warning_rect.size.x, 28, Color("fff7ed"))
+
+
+func _draw_mobile_touch_guidance() -> void:
+	if mobile_touch_hint_time <= 0.0 or in_menu or paused or game_over or level_cleared:
+		return
+	var alpha: float = clamp(mobile_touch_hint_time / MOBILE_TOUCH_HINT_TIME, 0.0, 1.0)
+	var panel_rect := Rect2(Vector2(272, 564), Vector2(736, 54))
+	var pulse: float = (sin(Time.get_ticks_msec() / 220.0) + 1.0) * 0.5
+	draw_rect(panel_rect, Color("042f3f", 0.58 * alpha), true)
+	draw_rect(panel_rect, Color("a7f3d0", (0.34 + pulse * 0.16) * alpha), false, 2.0)
+	draw_circle(panel_rect.position + Vector2(38, 27), 17.0 + pulse * 3.0, Color("22d3ee", 0.22 * alpha))
+	draw_string(chinese_font, Vector2(panel_rect.position.x + 16, panel_rect.position.y + 35), "触控提示", HORIZONTAL_ALIGNMENT_LEFT, 96, 18, Color("ccfbf1", alpha))
+	draw_string(chinese_font, Vector2(panel_rect.position.x + 118, panel_rect.position.y + 35), "建议横屏｜点敌人攻击，点金币收集，按住拖过金币可连收", HORIZONTAL_ALIGNMENT_LEFT, 590, 19, Color("f0fdfa", alpha))
 
 
 func _draw_core_progress_slots() -> void:
@@ -603,6 +629,8 @@ func _start_level(level: int) -> void:
 	last_enemy_type = "normal"
 	no_fish_timer = 0.0
 	goal_message_time = 5.0
+	mobile_touch_hint_seen = false
+	mobile_touch_hint_time = 0.0
 	pet_message_time = 0.0
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
@@ -647,6 +675,8 @@ func _show_main_menu() -> void:
 	last_enemy_type = "normal"
 	no_fish_timer = 0.0
 	goal_message_time = 0.0
+	mobile_touch_hint_seen = false
+	mobile_touch_hint_time = 0.0
 	pet_message_time = 0.0
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
@@ -999,6 +1029,7 @@ func _update_enemy_waves(delta: float) -> void:
 	warning_time = WaveLogic.tick_timer(warning_time, delta)
 	pet_message_time = WaveLogic.tick_timer(pet_message_time, delta)
 	goal_message_time = WaveLogic.tick_timer(goal_message_time, delta)
+	mobile_touch_hint_time = WaveLogic.tick_timer(mobile_touch_hint_time, delta)
 	safe_reward_timer = WaveLogic.tick_safe_reward_timer(safe_reward_timer, delta)
 	if _is_safe_reward_active():
 		return
