@@ -2007,20 +2007,28 @@ func _draw_overlay_messages() -> void:
 		draw_string(chinese_font, Vector2(470, 270), "否则本局经营失败", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("fecdd3"))
 	if game_over:
 		draw_rect(Rect2(Vector2.ZERO, VIEWPORT_SIZE), Color(0, 0, 0, 0.45), true)
-		_draw_result_panel("经营失败", "点击顶部“重新开始”再试一次，或回到菜单选关", Color("fecaca"))
+		_draw_result_panel("经营失败", "鱼群断档", "鱼群全灭，且金币不足购买新鱼", "点击顶部“重新开始”再试一次，或回到菜单选关", Color("fecaca"), false)
 	elif level_cleared:
 		draw_rect(Rect2(Vector2.ZERO, VIEWPORT_SIZE), Color(0, 0, 0, 0.35), true)
 		if current_level < MAX_LEVEL:
-			_draw_result_panel("通关！水晶核心已集齐", "点击顶部“下一关”继续，或回菜单查看已解锁关卡", Color("bbf7d0"))
+			_draw_result_panel("通关！水晶核心已集齐", "通关达成", "水晶核心 3/3 · 新关卡与助手进度已保存", "点击顶部“下一关”继续，或回菜单查看已解锁关卡", Color("bbf7d0"), true)
 		else:
-			_draw_result_panel("Demo 完成！三关全部通过", "点击顶部“回菜单”查看存档，或重玩任意已解锁关卡", Color("bbf7d0"))
+			_draw_result_panel("Demo 完成！三关全部通过", "守卫完成", "三关全部通过 · 所有助手已完成解锁", "点击顶部“回菜单”查看存档，或重玩任意已解锁关卡", Color("bbf7d0"), true)
 
 
-func _draw_result_panel(title: String, subtitle: String, accent: Color) -> void:
+func _draw_result_panel(title: String, result_label: String, result_detail: String, subtitle: String, accent: Color, success: bool) -> void:
 	var panel_rect := Rect2(Vector2(354, 178), Vector2(572, 372))
+	var badge_color := Color("166534") if success else Color("7f1d1d")
+	var detail_color := Color("dcfce7") if success else Color("fecaca")
 	draw_rect(panel_rect, Color("061826", 0.9), true)
 	draw_rect(panel_rect, accent, false, 3.0)
+	draw_rect(Rect2(panel_rect.position + Vector2(22, 22), Vector2(panel_rect.size.x - 44, 52)), Color("082f49", 0.58), true)
+	draw_rect(Rect2(panel_rect.position + Vector2(22, 22), Vector2(panel_rect.size.x - 44, 52)), Color(accent, 0.28), false, 2.0)
+	draw_rect(Rect2(panel_rect.position + Vector2(202, 34), Vector2(168, 28)), badge_color, true)
+	draw_rect(Rect2(panel_rect.position + Vector2(202, 34), Vector2(168, 28)), accent, false, 2.0)
+	draw_string(chinese_font, Vector2(panel_rect.position.x + 202, panel_rect.position.y + 55), result_label, HORIZONTAL_ALIGNMENT_CENTER, 168, 18, Color.WHITE)
 	draw_string(chinese_font, Vector2(panel_rect.position.x, 238), title, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 34, Color.WHITE)
+	draw_string(chinese_font, Vector2(panel_rect.position.x, 266), result_detail, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 18, detail_color)
 	var stats := [
 		"用时：%s" % _format_time(run_play_seconds),
 		"击败敌人：%d" % run_enemies_defeated,
@@ -2029,8 +2037,13 @@ func _draw_result_panel(title: String, subtitle: String, accent: Color) -> void:
 		"购买鱼：%d" % run_fish_bought,
 		"最高鱼数：%d" % run_peak_fish_count,
 	]
+	var stats_rect := Rect2(Vector2(416, 292), Vector2(448, 188))
+	draw_rect(stats_rect, Color("0f2f45", 0.42), true)
+	draw_rect(stats_rect, Color("7dd3fc", 0.16), false, 2.0)
 	for index in range(stats.size()):
-		draw_string(chinese_font, Vector2(438, 294 + index * 32), stats[index], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("dbeafe"))
+		var stat_color := Color("fecaca") if not success and index == 2 and run_fish_lost > 0 else Color("dbeafe")
+		draw_circle(Vector2(438, 312 + index * 26), 3.5, accent)
+		draw_string(chinese_font, Vector2(454, 320 + index * 26), stats[index], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, stat_color)
 	draw_string(chinese_font, Vector2(panel_rect.position.x, 510), subtitle, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 21, Color("cbd5e1"))
 
 
