@@ -547,7 +547,7 @@ func _setup_main_menu() -> void:
 		level_buttons.append(button)
 		menu_panel.add_child(button)
 
-	var helper_note := AquariumUIFactory.label(chinese_font, 18, "助手：第 1 关通关后清洁螺会移动收集金币", Vector2(42, 438), Vector2(menu_panel.size.x - 84, 34), HORIZONTAL_ALIGNMENT_CENTER)
+	var helper_note := AquariumUIFactory.label(chinese_font, 18, "通关关卡可解锁助手，奖励见关卡卡片", Vector2(42, 438), Vector2(menu_panel.size.x - 84, 34), HORIZONTAL_ALIGNMENT_CENTER)
 	menu_panel.add_child(helper_note)
 
 	save_manager_button = AquariumUIFactory.button(chinese_font, 20, "存档管理", Vector2(290, 488), Vector2(200, 54))
@@ -740,7 +740,7 @@ func _update_menu_ui() -> void:
 		var config: Dictionary = GameData.LEVEL_CONFIGS[level]
 		var unlocked := has_active_save and level <= highest_unlocked_level
 		var clear_mark := " ✓" if cleared_levels.has(level) else ""
-		button.text = "第 %d 关%s\n%s" % [level, clear_mark, config["name"]]
+		button.text = "第 %d 关%s\n%s\n%s" % [level, clear_mark, config["name"], _level_reward_preview_text(level)]
 		button.disabled = not unlocked
 		button.tooltip_text = helper_text if (level == 2 and not unlocked_cleaner_snail) or (level == 3 and not unlocked_bubble_seahorse) else ""
 
@@ -1532,6 +1532,16 @@ func _next_helper_unlock_text() -> String:
 	if not unlocked_electric_jellyfish:
 		return "通关第 3 关解锁电光水母"
 	return "清洁螺、泡泡海马与电光水母已解锁"
+
+
+func _level_reward_preview_text(level: int) -> String:
+	if level == 1:
+		return "已解锁：清洁螺" if unlocked_cleaner_snail else "奖励：清洁螺"
+	if level == 2:
+		return "已解锁：泡泡海马" if unlocked_bubble_seahorse else "奖励：泡泡海马"
+	if level == 3:
+		return "已解锁：电光水母" if unlocked_electric_jellyfish else "奖励：电光水母"
+	return "奖励：助手"
 
 
 func _first_existing_slot_index() -> int:
