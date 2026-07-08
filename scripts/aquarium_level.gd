@@ -42,6 +42,7 @@ const COIN_COMBO_BONUS_PER_STEP := 0.05
 const COIN_COMBO_MAX_MULTIPLIER := 1.4
 const MOBILE_TOUCH_HINT_TIME := 6.0
 const BEGINNER_COACH_TIME := 6.0
+const CORE_PURCHASE_FEEDBACK_TIME := 1.1
 const MAX_LEVEL := 3
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
@@ -119,6 +120,8 @@ var coin_combo_timer := 0.0
 var mobile_touch_hint_seen := false
 var mobile_touch_hint_time := 0.0
 var beginner_coach_time := 0.0
+var core_purchase_feedback_time := 0.0
+var core_purchase_feedback_slot := -1
 
 var fish_list: Array[Dictionary] = []
 var food_list: Array[Dictionary] = []
@@ -195,6 +198,7 @@ func _process(delta: float) -> void:
 	_update_hit_effects(delta)
 	_update_guard_effects(delta)
 	_update_jellyfish_effects(delta)
+	_update_core_purchase_feedback(delta)
 	_update_enemy_waves(delta)
 	_update_coin_combo(delta)
 	_update_play_time(delta)
@@ -277,6 +281,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 	_draw_core_progress_slots()
+	_draw_core_purchase_feedback()
 	_draw_helper_status_panel()
 	_draw_food()
 	_draw_pets()
@@ -416,6 +421,32 @@ func _draw_core_diamond(center: Vector2, purchased: bool, ready: bool, near_read
 	if purchased or ready:
 		draw_line(center + Vector2(-5, 0), center + Vector2(0, 6), Color("fff7ed", 0.95), 2.0)
 		draw_line(center + Vector2(0, 6), center + Vector2(8, -7), Color("fff7ed", 0.95), 2.0)
+
+
+func _draw_core_purchase_feedback() -> void:
+	if core_purchase_feedback_time <= 0.0 or core_purchase_feedback_slot < 0:
+		return
+	var progress: float = 1.0 - core_purchase_feedback_time / CORE_PURCHASE_FEEDBACK_TIME
+	var alpha: float = clamp(core_purchase_feedback_time / CORE_PURCHASE_FEEDBACK_TIME, 0.0, 1.0)
+	var center: Vector2 = _core_slot_center(core_purchase_feedback_slot)
+	var ring_radius: float = 30.0 + progress * 28.0
+	draw_arc(center, ring_radius, 0.0, TAU, 36, Color("fde68a", 0.7 * alpha), 4.0)
+	draw_arc(center, ring_radius + 10.0, 0.0, TAU, 36, Color("facc15", 0.34 * alpha), 2.0)
+	for index in range(6):
+		var angle: float = TAU * float(index) / 6.0 + progress * 0.55
+		var direction := Vector2(cos(angle), sin(angle))
+		var start: Vector2 = center + direction * (20.0 + progress * 12.0)
+		var end: Vector2 = center + direction * (38.0 + progress * 18.0)
+		draw_line(start, end, Color("fff7ed", 0.8 * alpha), 2.0)
+	var label := "核心集齐！" if cores >= 3 else "水晶核心 +1"
+	var sub_label := "进度 %d/3" % clamp(cores, 0, 3)
+	var text_origin := center + Vector2(-72, -48 - progress * 18.0)
+	draw_string(chinese_font, text_origin, label, HORIZONTAL_ALIGNMENT_CENTER, 144, 22, Color("fef3c7", alpha))
+	draw_string(chinese_font, text_origin + Vector2(0, 24), sub_label, HORIZONTAL_ALIGNMENT_CENTER, 144, 16, Color("bae6fd", 0.9 * alpha))
+
+
+func _core_slot_center(slot_index: int) -> Vector2:
+	return Vector2(412 + 142 + slot_index * 92, 638 + 29)
 
 
 func _load_chinese_font() -> void:
@@ -670,6 +701,7 @@ func _start_level(level: int) -> void:
 	mobile_touch_hint_seen = false
 	mobile_touch_hint_time = 0.0
 	beginner_coach_time = BEGINNER_COACH_TIME if current_level == 1 else 0.0
+	_reset_core_purchase_feedback()
 	pet_message_time = 0.0
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
@@ -717,6 +749,7 @@ func _show_main_menu() -> void:
 	mobile_touch_hint_seen = false
 	mobile_touch_hint_time = 0.0
 	beginner_coach_time = 0.0
+	_reset_core_purchase_feedback()
 	pet_message_time = 0.0
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
@@ -1115,6 +1148,12 @@ func _update_jellyfish_effects(delta: float) -> void:
 			jellyfish_effects[index] = effect
 
 
+func _update_core_purchase_feedback(delta: float) -> void:
+	core_purchase_feedback_time = max(0.0, core_purchase_feedback_time - delta)
+	if core_purchase_feedback_time <= 0.0:
+		core_purchase_feedback_slot = -1
+
+
 func _try_collect_coin(click_position: Vector2) -> bool:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
@@ -1394,6 +1433,16 @@ func _try_start_safe_reward_window() -> void:
 	_play_sfx("coin")
 
 
+func _start_core_purchase_feedback(purchased_slot: int) -> void:
+	core_purchase_feedback_slot = clamp(purchased_slot, 0, 2)
+	core_purchase_feedback_time = CORE_PURCHASE_FEEDBACK_TIME
+
+
+func _reset_core_purchase_feedback() -> void:
+	core_purchase_feedback_slot = -1
+	core_purchase_feedback_time = 0.0
+
+
 func _update_core_purchase_hint(core_affordable: bool) -> void:
 	core_hint_label.visible = core_affordable
 	if core_affordable:
@@ -1613,6 +1662,7 @@ func _on_buy_core_pressed() -> void:
 		return
 	money -= cost
 	cores += 1
+	_start_core_purchase_feedback(cores - 1)
 	_play_sfx("buy")
 	if ProgressionLogic.should_clear_level(cores):
 		if ProgressionLogic.should_unlock_cleaner_snail(current_level, unlocked_cleaner_snail):
