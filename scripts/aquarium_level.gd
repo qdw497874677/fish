@@ -277,6 +277,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 	_draw_core_progress_slots()
+	_draw_helper_status_panel()
 	_draw_food()
 	_draw_pets()
 	_draw_fish()
@@ -343,6 +344,26 @@ func _draw_beginner_coach_hint() -> void:
 	draw_circle(panel_rect.position + Vector2(42, 36), 8.0, Color("facc15", 0.82 * alpha))
 	draw_string(chinese_font, Vector2(panel_rect.position.x + 76, panel_rect.position.y + 31), "新手路线：先点水体投喂 → 收金币 → 钱够就买水晶核心", HORIZONTAL_ALIGNMENT_LEFT, 580, 20, Color("fef9c3", alpha))
 	draw_string(chinese_font, Vector2(panel_rect.position.x + 76, panel_rect.position.y + 57), "敌人出现时先点敌人，防守期鱼饥饿会减缓。", HORIZONTAL_ALIGNMENT_LEFT, 580, 17, Color("bae6fd", alpha))
+
+
+func _draw_helper_status_panel() -> void:
+	if in_menu or paused or game_over or level_cleared:
+		return
+	var panel_rect := Rect2(Vector2(18, 116), Vector2(286, 104))
+	draw_rect(panel_rect, Color("042f3f", 0.56), true)
+	draw_rect(panel_rect, Color("7dd3fc", 0.24), false, 2.0)
+	draw_string(chinese_font, Vector2(panel_rect.position.x + 14, panel_rect.position.y + 24), "助手状态", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("e0f2fe"))
+	_draw_helper_status_row(panel_rect.position + Vector2(14, 48), "清洁螺", "自动收底部金币", unlocked_cleaner_snail, Color("c4b5fd"))
+	_draw_helper_status_row(panel_rect.position + Vector2(14, 70), "泡泡海马", "饥饿时自动投喂", unlocked_bubble_seahorse, Color("67e8f9"))
+	_draw_helper_status_row(panel_rect.position + Vector2(14, 92), "电光水母", "入侵时自动电击", unlocked_electric_jellyfish, Color("a5f3fc"))
+
+
+func _draw_helper_status_row(origin: Vector2, helper_name: String, ability_text: String, unlocked: bool, accent: Color) -> void:
+	var status_color := accent if unlocked else Color("64748b")
+	var status_text := ability_text if unlocked else "未解锁"
+	draw_circle(origin + Vector2(6, -5), 4.5, status_color)
+	draw_string(chinese_font, origin + Vector2(18, 0), helper_name, HORIZONTAL_ALIGNMENT_LEFT, 72, 15, Color("f8fafc" if unlocked else "94a3b8"))
+	draw_string(chinese_font, origin + Vector2(94, 0), status_text, HORIZONTAL_ALIGNMENT_LEFT, 170, 15, Color("dbeafe" if unlocked else "94a3b8"))
 
 
 func _draw_core_progress_slots() -> void:
