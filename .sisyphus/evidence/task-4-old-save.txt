@@ -1,0 +1,41 @@
+Task 4 evidence: old completed-three-level save compatibility
+
+Static inspection source:
+- scripts/systems/save_system.gd:3 keeps `const SAVE_SLOT_COUNT := 3`.
+- scripts/systems/save_system.gd:4 keeps `const SAVE_PATH := "user://aquarium_guard_save.json"`.
+- scripts/systems/save_system.gd:20-39 defines `normalize_slot(raw_slot, max_level)`.
+- scripts/systems/save_system.gd:26 clamps `highest_unlocked_level` with `clamp(int(...), 1, max_level)`.
+- scripts/systems/save_system.gd:27-29 copies helper booleans without resetting them.
+- scripts/systems/save_system.gd:31-38 normalizes `cleared_levels` and de-duplicates levels.
+- scripts/aquarium_level.gd:46 sets `MAX_LEVEL := 5`.
+- scripts/aquarium_level.gd:1499-1528 supports both current slot-based save files and old single-save files.
+- scripts/aquarium_level.gd:1516-1525 maps old single-save data into slot 0, then normalizes it.
+- scripts/aquarium_level.gd:1561-1562 calls `SaveSystem.normalize_slot(raw_slot, MAX_LEVEL)`.
+- scripts/aquarium_level.gd:1582-1597 applies normalized slot progress and re-clamps `cleared_levels` into `1..MAX_LEVEL`.
+- scripts/aquarium_level.gd:1638-1642 only unlocks the next level when the existing clear flow records a level clear.
+- scripts/gameplay/progression_logic.gd:16-19 unlocks `current_level + 1` only after a clear and never runs as a load-time migration.
+
+Old save-like input under `max_level = 5`:
+{
+  "exists": true,
+  "name": "旧存档",
+  "highest_unlocked_level": 3,
+  "unlocked_cleaner_snail": true,
+  "unlocked_bubble_seahorse": true,
+  "unlocked_electric_jellyfish": true,
+  "cleared_levels": [1, 2, 3],
+  "total_play_seconds": 120.0
+}
+
+Expected normalization result from `normalize_slot(..., 5)`:
+- `highest_unlocked_level`: `clamp(3, 1, 5)` => 3, so it is not reset or downgraded.
+- helper flags: all remain `true`; there is no helper reset path in normalization.
+- `cleared_levels`: [1, 2, 3] remain [1, 2, 3]; all values are inside 1..5 and duplicates would be removed only if present.
+- `exists`: remains true and can be applied by `_apply_slot_progress`.
+
+Compatibility conclusion:
+- Old completed-three-level saves remain valid under `MAX_LEVEL := 5`.
+- No fourth save slot was added.
+- `SAVE_PATH` remains `user://aquarium_guard_save.json`.
+- No save schema rewrite is needed.
+- No special auto-unlock migration for level 4 exists or is required; a save with highest unlocked level 3 stays at 3 until the player clears level 3 through the normal progression path.

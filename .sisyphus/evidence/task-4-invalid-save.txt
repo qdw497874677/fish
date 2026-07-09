@@ -1,0 +1,30 @@
+Task 4 evidence: invalid save level values are bounded
+
+Static inspection source:
+- scripts/systems/save_system.gd:20-39 is the save compatibility choke point.
+- scripts/systems/save_system.gd:26 clamps `highest_unlocked_level` into `1..max_level`.
+- scripts/systems/save_system.gd:31-38 accepts `cleared_levels` only when it is an Array, clamps every entry into `1..max_level`, and de-duplicates entries.
+- scripts/aquarium_level.gd:46 sets `MAX_LEVEL := 5`.
+- scripts/aquarium_level.gd:1561-1562 passes `MAX_LEVEL` into `SaveSystem.normalize_slot`.
+- scripts/aquarium_level.gd:1582-1597 applies normalized progress and again clamps slot cleared levels into `1..MAX_LEVEL` before gameplay/UI use.
+- scripts/aquarium_level.gd:800-807 renders level buttons only from the actual `level_buttons` array created for `range(1, MAX_LEVEL + 1)`, so normalized cleared markers cannot create extra level buttons.
+- scripts/aquarium_level.gd:1743-1747 blocks direct start requests above `highest_unlocked_level`; after normalization, that value is at most 5.
+
+Invalid save-like inputs under `max_level = 5`:
+1. `highest_unlocked_level: 99`
+   - `normalize_slot(..., 5)` computes `clamp(99, 1, 5)` => 5.
+   - Existing flow cannot start a level beyond 5 via the normal menu because only five buttons are created.
+
+2. `highest_unlocked_level: 0`
+   - `normalize_slot(..., 5)` computes `clamp(0, 1, 5)` => 1.
+   - Continue/start flow targets at least level 1, avoiding a level-0 config lookup.
+
+3. `cleared_levels: [-2, 0, 1, 2, 5, 6, 99]`
+   - Each entry is converted to int and clamped into `1..5`.
+   - Result after de-duplication is `[1, 2, 5]` (values below 1 collapse to 1; values above 5 collapse to 5).
+   - `_apply_slot_progress` repeats the same clamp before assigning runtime `cleared_levels`, so display/progression receives bounded integers.
+
+Safety conclusion:
+- Invalid highest level values above 5 or below 1 normalize safely into `1..5`.
+- Cleared-level entries outside `1..5` are bounded and de-duplicated, so they cannot crash the menu/progression display by introducing arbitrary level IDs.
+- No code change was needed for the verified edge cases.
