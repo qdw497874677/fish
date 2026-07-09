@@ -1,0 +1,39 @@
+Task 6 final diff and scope assessment
+
+Commands run:
+- godot --headless --path . --quit-after 120
+  - Exit status: 0
+  - Evidence: .sisyphus/evidence/task-6-headless.txt
+  - Notes: only known non-blocking warning was observed: WARNING: 2 ObjectDB instances were leaked at exit.
+- godot --headless --path . --export-pack Web "build/web/godot.pck"
+  - Exit status: 0
+  - Evidence: .sisyphus/evidence/task-6-export-pack.txt
+  - Notes: export reached [ DONE ] savepack and regenerated build/web/godot.pck.
+- test -f "build/web/godot.pck"
+  - Exit status: 0
+  - Result: build/web/godot.pck exists, size=11594632 bytes, mtime=2026-07-09 14:24:15.
+
+Final changed tracked files from git diff --name-status:
+- M build/web/godot.pck
+- M docs/web-runbook.md
+- M scripts/aquarium_level.gd
+- M scripts/data/game_data.gd
+- M scripts/gameplay/progression_logic.gd
+
+Task 6 evidence files created/updated:
+- .sisyphus/evidence/task-6-headless.txt
+- .sisyphus/evidence/task-6-export-pack.txt
+- .sisyphus/evidence/task-6-final-diff.txt
+
+Static scope guardrails checked:
+- scripts/data/game_data.gd has five level configs using existing keys only: name, initial_money, initial_fish, core_base_cost, core_step_cost, enemy_timer, tank_enemy_chance, thief_enemy_chance, goal, tip.
+- scripts/aquarium_level.gd sets MAX_LEVEL := 5 and still delegates SAVE_SLOT_COUNT to SaveSystem.SAVE_SLOT_COUNT.
+- scripts/systems/save_system.gd preserves SAVE_SLOT_COUNT := 3 and SAVE_PATH := "user://aquarium_guard_save.json".
+- scripts/gameplay/progression_logic.gd keeps electric jellyfish unlock fixed to current_level == 3.
+- docs/web-runbook.md documents the active Web build as five levels while preserving 3 save slots, 3 crystal cores, build/web/godot.pck, and the export-pack command.
+- Search/static inspection found no new Boss system, Boss enemy, new fish/enemy/helper type, new save slot count, new scene, world map, pagination, or dynamic difficulty requirement in the changed source/docs.
+
+Scope assessment:
+- Intended scope: five-level source/config/progression/UI copy, Web runbook update, regenerated Web PCK, and Task 6 evidence.
+- No new gameplay feature was implemented during Task 6; this task only validated, exported, and prepared evidence/commit planning.
+- .gd LSP diagnostics are unavailable in this environment, so Godot headless startup and Web export-pack are the authoritative validation results.
