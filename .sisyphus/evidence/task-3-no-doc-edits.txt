@@ -1,0 +1,7 @@
+Command run from repo root:
+
+git diff -- docs
+
+Result:
+
+No output. This confirms the audit-only task did not modify any files under docs/.
