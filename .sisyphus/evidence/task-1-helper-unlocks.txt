@@ -1,0 +1,16 @@
+Task 1 helper unlock evidence
+
+Static inspection:
+- scripts/gameplay/progression_logic.gd should_unlock_cleaner_snail(current_level, unlocked_cleaner_snail) returns current_level == 1 and not unlocked_cleaner_snail.
+- scripts/gameplay/progression_logic.gd should_unlock_bubble_seahorse(current_level, unlocked_bubble_seahorse) returns current_level == 2 and not unlocked_bubble_seahorse.
+- scripts/gameplay/progression_logic.gd should_unlock_electric_jellyfish(current_level, max_level, unlocked_electric_jellyfish) now returns current_level == 3 and not unlocked_electric_jellyfish. The max_level parameter is retained for existing call compatibility.
+- scripts/aquarium_level.gd _on_buy_core_pressed() still calls the three helper unlock checks only after ProgressionLogic.should_clear_level(cores).
+- Level 4 and level 5 have no helper-specific unlock path; only the fixed level 1/2/3 rules can flip helper booleans.
+- ProgressionLogic.unlocked_level_after_clear(current_level, highest_unlocked_level, max_level) still unlocks next level while current_level < max_level, so 3 -> 4 -> 5 works with MAX_LEVEL := 5.
+
+Validation command:
+- godot --headless --path . --quit-after 120
+Result:
+- Exit code 0.
+- Output contained only known warning: WARNING: 2 ObjectDB instances were leaked at exit.
+
