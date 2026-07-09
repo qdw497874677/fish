@@ -1,0 +1,59 @@
+{
+  "active_plan": "/Users/quandawei/项目/game/fish/.sisyphus/plans/next-major-phase.md",
+  "started_at": "2026-07-09T01:58:43.051Z",
+  "session_ids": [
+    "ses_0d77e25fdffe191tSflbm3eYyr"
+  ],
+  "session_origins": {
+    "ses_0d77e25fdffe191tSflbm3eYyr": "direct"
+  },
+  "plan_name": "next-major-phase",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Add level 4/5 data and progression decisions",
+      "session_id": "ses_0bb64a099ffeIWVXjthU5EF8Op",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-07-09T02:03:43.195Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Adapt level selection UI and game-facing copy for five levels",
+      "session_id": "ses_0bb5fde06ffeqYlHumZ64jZ5O1",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-07-09T02:10:30.166Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Verify save compatibility and progression edge cases for max level 5",
+      "session_id": "ses_0ba7bdeabffeuPGdS292DZuT0D",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-07-09T06:17:47.067Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Run full validation, export Web PCK, and prepare atomic commits",
+      "session_id": "ses_0ba74e362ffeBBdfMZur7lEjrq",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-07-09T06:27:50.168Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_0ba6bee03ffepJkUrumbksimAs",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-07-09T06:36:10.640Z"
+    }
+  }
+}
