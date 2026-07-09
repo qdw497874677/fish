@@ -1,0 +1,8 @@
+
+## Task 2 final copy evidence
+- Source searches: scripts/**/*.gd for `三关|three-level|三关全部通过|Demo 完成|奖励：助手|Boss|boss` returned no matches after the edit.
+- Level 4 preview in `scripts/aquarium_level.gd`: `挑战：混合入侵与护金`.
+- Level 5 preview in `scripts/aquarium_level.gd`: `挑战：终段高压耐久`.
+- Final completion copy now uses `当前阶段全部通关` and `现有关卡全部通过 · 水族防线已稳定`.
+- Preserved legitimate 3-related concepts: `SAVE_SLOT_COUNT := 3`, `三个槽位都已有存档，请先删除一个。`, HUD `水晶：%d/3`, and result `水晶核心 3/3`.
+- No Boss/boss copy was introduced in active scripts.
