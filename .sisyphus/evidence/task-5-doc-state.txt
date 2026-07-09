@@ -1,0 +1,46 @@
+# Task 5 doc state verification
+
+Updated file:
+
+- `docs/web-runbook.md`
+
+Current-state checks:
+
+- `docs/web-runbook.md` now says the Web version is a five-level short expansion.
+- Start menu wording now documents `第 1-5 关选择按钮`.
+- Level 1-3 helper reward previews are preserved.
+- Level 4 preview is documented as `挑战：混合入侵与护金`.
+- Level 5 preview is documented as `挑战：终段高压耐久`.
+- Assistant section says level 4/5 reuse existing helpers and add challenge pressure, with no new helper claim.
+- Difficulty baseline includes:
+  - Level 1: initial 230 money, 3 fish.
+  - Level 4: initial 350 money, 4 fish, mixed tank and thief pressure.
+  - Level 5: initial 380 money, 5 fish, higher enemy pressure.
+
+Keyword search after edit:
+
+```text
+Search: 三关|3 关|第 1-3|1-3|3 levels|Demo
+
+docs/web-runbook.md
+  line 142: 第 3 关 helper unlock, valid current rule.
+  line 153: 第 1-5 关 selection plus 第 1-3 关 helper reward previews, valid current rule.
+  line 197: 甲壳怪 第 3 关开始更常见, valid enemy rule.
+  line 257: 当前 Web 版本是五关短扩展, valid current state.
+  line 266: 第 3 关 helper effect baseline, valid current rule.
+
+docs/mvp-game-design.md
+  Demo and 第 3 关 matches remain in original MVP or helper-unlock context.
+
+docs/development-roadmap.md
+  Demo and 3 关 matches remain in first-version roadmap context.
+
+docs/development-guidelines.md
+  Web Demo match is platform target wording, not a level-count claim.
+```
+
+Preserved semantics:
+
+- `3 个存档槽` remains unchanged in `docs/web-runbook.md`.
+- `3 格 水晶核心` remains unchanged in `docs/web-runbook.md`.
+- No Boss or new fish, enemy, helper claim was added to current Web runbook text.

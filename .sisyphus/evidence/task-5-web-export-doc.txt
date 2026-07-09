@@ -1,0 +1,29 @@
+# Task 5 Web export doc verification
+
+Checked file:
+
+- `docs/web-runbook.md`
+
+Required PCK path remains documented exactly:
+
+```text
+build/web/godot.pck
+```
+
+Required export-pack command remains documented exactly:
+
+```bash
+godot --headless --path . --export-pack Web "build/web/godot.pck"
+```
+
+Search results after edit:
+
+```text
+docs/web-runbook.md
+  line 12: build/web/godot.pck
+  line 40: godot --headless --path . --export-pack Web "build/web/godot.pck"
+  line 75: godot --headless --path . --export-pack Web "build/web/godot.pck"
+  line 103: godot --headless --path . --export-pack Web "build/web/godot.pck"
+```
+
+No Web export command, PCK filename, or PCK path was changed during Task 5. Web PCK was not exported in this task.
