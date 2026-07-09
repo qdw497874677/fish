@@ -28,7 +28,7 @@ static func should_unlock_bubble_seahorse(current_level: int, unlocked_bubble_se
 
 
 static func should_unlock_electric_jellyfish(current_level: int, max_level: int, unlocked_electric_jellyfish: bool) -> bool:
-	return current_level == max_level and not unlocked_electric_jellyfish
+	return current_level == 3 and not unlocked_electric_jellyfish
 
 
 static func should_clear_level(cores: int) -> bool:

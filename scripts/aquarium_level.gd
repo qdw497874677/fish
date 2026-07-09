@@ -43,7 +43,7 @@ const COIN_COMBO_MAX_MULTIPLIER := 1.4
 const MOBILE_TOUCH_HINT_TIME := 6.0
 const BEGINNER_COACH_TIME := 6.0
 const CORE_PURCHASE_FEEDBACK_TIME := 1.1
-const MAX_LEVEL := 3
+const MAX_LEVEL := 5
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
 const CLEANER_SNAIL_SPEED := 185.0
@@ -593,16 +593,25 @@ func _setup_main_menu() -> void:
 	var level_title := AquariumUIFactory.label(chinese_font, 22, "选择关卡", Vector2(0, 268), Vector2(menu_panel.size.x, 34), HORIZONTAL_ALIGNMENT_CENTER)
 	menu_panel.add_child(level_title)
 
+	var level_button_size := Vector2(188, 78)
+	var level_button_gap := Vector2(22, 8)
+	var level_grid_start_y := 306.0
 	for level in range(1, MAX_LEVEL + 1):
-		var button := AquariumUIFactory.button(chinese_font, 18, "", Vector2(95 + (level - 1) * 215, 326), Vector2(180, 88))
+		var row: int = int((level - 1) / 3)
+		var column: int = (level - 1) % 3
+		var row_count: int = mini(3, MAX_LEVEL - row * 3)
+		var row_width: float = float(row_count) * level_button_size.x + float(row_count - 1) * level_button_gap.x
+		var level_button_x: float = (menu_panel.size.x - row_width) * 0.5 + float(column) * (level_button_size.x + level_button_gap.x)
+		var level_button_y: float = level_grid_start_y + float(row) * (level_button_size.y + level_button_gap.y)
+		var button := AquariumUIFactory.button(chinese_font, 16, "", Vector2(level_button_x, level_button_y), level_button_size)
 		button.pressed.connect(_on_level_button_pressed.bind(level))
 		level_buttons.append(button)
 		menu_panel.add_child(button)
 
-	var helper_note := AquariumUIFactory.label(chinese_font, 18, "通关关卡可解锁助手，奖励见关卡卡片", Vector2(42, 438), Vector2(menu_panel.size.x - 84, 34), HORIZONTAL_ALIGNMENT_CENTER)
+	var helper_note := AquariumUIFactory.label(chinese_font, 17, "通关关卡可解锁助手，后续关卡展示挑战提示", Vector2(42, 474), Vector2(menu_panel.size.x - 84, 28), HORIZONTAL_ALIGNMENT_CENTER)
 	menu_panel.add_child(helper_note)
 
-	save_manager_button = AquariumUIFactory.button(chinese_font, 20, "存档管理", Vector2(290, 488), Vector2(200, 54))
+	save_manager_button = AquariumUIFactory.button(chinese_font, 19, "存档管理", Vector2(290, 510), Vector2(200, 42))
 	save_manager_button.pressed.connect(_on_save_manager_pressed)
 	menu_panel.add_child(save_manager_button)
 
@@ -1611,7 +1620,11 @@ func _level_reward_preview_text(level: int) -> String:
 		return "已解锁：泡泡海马" if unlocked_bubble_seahorse else "奖励：泡泡海马"
 	if level == 3:
 		return "已解锁：电光水母" if unlocked_electric_jellyfish else "奖励：电光水母"
-	return "奖励：助手"
+	if level == 4:
+		return "挑战：混合入侵与护金"
+	if level == 5:
+		return "挑战：终段高压耐久"
+	return "挑战：守住水晶核心"
 
 
 func _first_existing_slot_index() -> int:
@@ -2114,7 +2127,7 @@ func _draw_overlay_messages() -> void:
 		if current_level < MAX_LEVEL:
 			_draw_result_panel("通关！水晶核心已集齐", "通关达成", "水晶核心 3/3 · 新关卡与助手进度已保存", "点击顶部“下一关”继续，或回菜单查看已解锁关卡", Color("bbf7d0"), true)
 		else:
-			_draw_result_panel("Demo 完成！三关全部通过", "守卫完成", "三关全部通过 · 所有助手已完成解锁", "点击顶部“回菜单”查看存档，或重玩任意已解锁关卡", Color("bbf7d0"), true)
+			_draw_result_panel("当前阶段全部通关", "守卫完成", "现有关卡全部通过 · 水族防线已稳定", "点击顶部“回菜单”查看存档，或重玩任意已解锁关卡", Color("bbf7d0"), true)
 
 
 func _draw_result_panel(title: String, result_label: String, result_detail: String, subtitle: String, accent: Color, success: bool) -> void:

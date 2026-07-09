@@ -37,6 +37,30 @@ const LEVEL_CONFIGS := {
 		"goal": "完成最终防线",
 		"tip": "甲壳怪更厚，成熟护卫鱼能自动攻击敌人。",
 	},
+	4: {
+		"name": "暗流护金缸",
+		"initial_money": 350,
+		"initial_fish": 4,
+		"core_base_cost": 760,
+		"core_step_cost": 390,
+		"enemy_timer": 11.5,
+		"tank_enemy_chance": 0.38,
+		"thief_enemy_chance": 0.46,
+		"goal": "守住金币并完成扩张",
+		"tip": "厚甲与偷金币怪会混合出现，先保金币再推进核心。",
+	},
+	5: {
+		"name": "终潮耐久缸",
+		"initial_money": 380,
+		"initial_fish": 5,
+		"core_base_cost": 900,
+		"core_step_cost": 470,
+		"enemy_timer": 10.0,
+		"tank_enemy_chance": 0.48,
+		"thief_enemy_chance": 0.52,
+		"goal": "完成当前阶段终局考验",
+		"tip": "高压入侵会持续逼近，利用三种助手稳住鱼群与金币。",
+	},
 }
 
 const FISH_TYPES := [
