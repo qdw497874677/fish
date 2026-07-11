@@ -90,6 +90,7 @@ const FISH_TYPES := [
 		"coin_interval": 5.8,
 		"growth_multiplier": 1.0,
 		"scale": 1.0,
+		"max_hp": 1,
 	},
 	{
 		"id": "gold",
@@ -102,6 +103,7 @@ const FISH_TYPES := [
 		"coin_interval": 6.6,
 		"growth_multiplier": 0.86,
 		"scale": 1.08,
+		"max_hp": 1,
 	},
 	{
 		"id": "guard",
@@ -115,5 +117,6 @@ const FISH_TYPES := [
 		"growth_multiplier": 1.18,
 		"scale": 1.18,
 		"guard": true,
+		"max_hp": 3,
 	},
 ]
