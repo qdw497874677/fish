@@ -1,0 +1,71 @@
+extends RefCounted
+
+const MAX_SELECTIONS := 2
+const MAX_OFFERS := 2
+const OFFER_COUNT := 3
+const GROWTH_MULTIPLIER := 1.2
+const COIN_LIFE_MULTIPLIER := 1.35
+const COIN_MAGNET_MULTIPLIER := 1.25
+const GUARD_RANGE_MULTIPLIER := 1.25
+const GUARD_COOLDOWN_MULTIPLIER := 0.8
+
+
+static func can_offer(upgrade_pool: Array, selected_ids: Array[String], selection_count: int, offer_count: int) -> bool:
+	if selection_count >= MAX_SELECTIONS or offer_count >= MAX_OFFERS:
+		return false
+	return available_upgrades(upgrade_pool, selected_ids).size() >= OFFER_COUNT
+
+
+static func available_upgrades(upgrade_pool: Array, selected_ids: Array[String]) -> Array[Dictionary]:
+	var available: Array[Dictionary] = []
+	for upgrade_value in upgrade_pool:
+		var upgrade: Dictionary = upgrade_value
+		if not selected_ids.has(str(upgrade.get("id", ""))):
+			available.append(upgrade)
+	return available
+
+
+static func create_offers(upgrade_pool: Array, selected_ids: Array[String]) -> Array[Dictionary]:
+	var available := available_upgrades(upgrade_pool, selected_ids)
+	available.shuffle()
+	var offers: Array[Dictionary] = []
+	for index in range(mini(OFFER_COUNT, available.size())):
+		offers.append(available[index])
+	return offers
+
+
+static func can_select(upgrade_id: String, offers: Array[Dictionary], selected_ids: Array[String], selection_count: int) -> bool:
+	if upgrade_id == "" or selection_count >= MAX_SELECTIONS or selected_ids.has(upgrade_id):
+		return false
+	for offer in offers:
+		if str(offer.get("id", "")) == upgrade_id:
+			return true
+	return false
+
+
+static func has_upgrade(selected_ids: Array[String], upgrade_id: String) -> bool:
+	return selected_ids.has(upgrade_id)
+
+
+static func growth_multiplier(selected_ids: Array[String]) -> float:
+	return GROWTH_MULTIPLIER if has_upgrade(selected_ids, "efficient_farming") else 1.0
+
+
+static func coin_life_multiplier(selected_ids: Array[String]) -> float:
+	return COIN_LIFE_MULTIPLIER if has_upgrade(selected_ids, "coin_preservation") else 1.0
+
+
+static func coin_magnet_multiplier(selected_ids: Array[String]) -> float:
+	return COIN_MAGNET_MULTIPLIER if has_upgrade(selected_ids, "coin_preservation") else 1.0
+
+
+static func guard_range_multiplier(selected_ids: Array[String]) -> float:
+	return GUARD_RANGE_MULTIPLIER if has_upgrade(selected_ids, "guard_training") else 1.0
+
+
+static func guard_cooldown_multiplier(selected_ids: Array[String]) -> float:
+	return GUARD_COOLDOWN_MULTIPLIER if has_upgrade(selected_ids, "guard_training") else 1.0
+
+
+static func should_drop_emergency_food(selected_ids: Array[String]) -> bool:
+	return has_upgrade(selected_ids, "emergency_supply")
