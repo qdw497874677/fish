@@ -1116,11 +1116,17 @@ func _update_enemy_waves(delta: float) -> void:
 	safe_reward_timer = WaveLogic.tick_safe_reward_timer(safe_reward_timer, delta)
 	if _is_safe_reward_active():
 		return
+	var level_config: Dictionary = _get_level_config()
+	if not WaveLogic.has_enemy_capacity(level_config, enemy_list.size()):
+		return
 	enemy_spawn_timer = WaveLogic.tick_spawn_timer(enemy_spawn_timer, delta)
 	if WaveLogic.should_spawn_enemy(enemy_spawn_timer):
-		_spawn_enemy()
-		_play_sfx("warning")
-		var base_timer: float = _get_level_config()["enemy_timer"]
+		var enemy_count: int = WaveLogic.enemy_count_for_wave(level_config, enemy_list.size())
+		for _enemy_index in range(enemy_count):
+			_spawn_enemy()
+		if enemy_count > 0:
+			_play_sfx("warning")
+		var base_timer: float = level_config["enemy_timer"]
 		enemy_spawn_timer = WaveLogic.next_enemy_spawn_timer(base_timer)
 
 
@@ -1413,6 +1419,9 @@ func _can_buy_core() -> bool:
 
 
 func _is_pre_invasion_warning_active() -> bool:
+	var level_config: Dictionary = _get_level_config()
+	if not WaveLogic.has_enemy_capacity(level_config, enemy_list.size()):
+		return false
 	return WaveLogic.is_pre_invasion_warning_active(enemy_spawn_timer, PRE_INVASION_WARNING_TIME, game_over, level_cleared)
 
 
