@@ -1,6 +1,7 @@
 extends Node2D
 
 const GameData := preload("res://scripts/data/game_data.gd")
+const UpgradeData := preload("res://scripts/data/upgrade_data.gd")
 const AudioSystem := preload("res://scripts/systems/audio_system.gd")
 const SaveSystem := preload("res://scripts/systems/save_system.gd")
 const AquariumUIFactory := preload("res://scripts/ui/aquarium_ui_factory.gd")
@@ -15,6 +16,7 @@ const EffectLogic := preload("res://scripts/gameplay/effect_logic.gd")
 const EconomyLogic := preload("res://scripts/gameplay/economy_logic.gd")
 const ComboLogic := preload("res://scripts/gameplay/combo_logic.gd")
 const ProgressionLogic := preload("res://scripts/gameplay/progression_logic.gd")
+const UpgradeLogic := preload("res://scripts/gameplay/upgrade_logic.gd")
 
 const VIEWPORT_SIZE := Vector2(1280, 720)
 const PLAY_RECT := Rect2(0, 96, 1280, 624)
@@ -29,6 +31,11 @@ const COIN_MAGNET_DURATION := 0.35
 const ENEMY_RADIUS := 24.0
 const FISH_SEPARATION_RADIUS := 58.0
 const FISH_SEPARATION_FORCE := 115.0
+const FISH_EVASION_RADIUS := 168.0
+const FISH_EVASION_FULL_STRENGTH_RADIUS := 88.0
+const FISH_EVASION_SPEED := 108.0
+const FISH_EVASION_MINIMUM_BLEND := 0.12
+const FISH_EVASION_MAXIMUM_BLEND := 0.28
 const GUARD_FISH_ATTACK_RANGE := 180.0
 const GUARD_FISH_ATTACK_COOLDOWN := 2.4
 const NO_FISH_GRACE_TIME := 12.0
@@ -43,6 +50,7 @@ const COIN_COMBO_MAX_MULTIPLIER := 1.4
 const MOBILE_TOUCH_HINT_TIME := 6.0
 const BEGINNER_COACH_TIME := 6.0
 const CORE_PURCHASE_FEEDBACK_TIME := 1.1
+const TACTICAL_UPGRADE_TIMEOUT := 10.0
 const MAX_LEVEL := 5
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
@@ -111,6 +119,13 @@ var run_play_seconds := 0.0
 var run_enemies_defeated := 0
 var run_fish_lost := 0
 var run_money_earned := 0
+var run_coin_generated := 0
+var run_coin_collected := 0
+var run_coin_bonus := 0
+var run_coin_stolen := 0
+var run_coin_lost := 0
+var run_fish_starved := 0
+var run_fish_eaten := 0
 var run_fish_bought := 0
 var run_peak_fish_count := 0
 var audio_enabled := true
@@ -122,6 +137,12 @@ var mobile_touch_hint_time := 0.0
 var beginner_coach_time := 0.0
 var core_purchase_feedback_time := 0.0
 var core_purchase_feedback_slot := -1
+var tactical_upgrade_active := false
+var tactical_upgrade_timer := 0.0
+var tactical_upgrade_selection_count := 0
+var tactical_upgrade_offer_count := 0
+var tactical_upgrade_offers: Array[Dictionary] = []
+var selected_tactical_upgrade_ids: Array[String] = []
 
 var fish_list: Array[Dictionary] = []
 var food_list: Array[Dictionary] = []
@@ -162,6 +183,15 @@ var pause_button: Button
 var restart_button: Button
 var menu_button: Button
 var audio_button: Button
+var tactical_upgrade_blocker: Panel
+var tactical_upgrade_panel: Panel
+var tactical_upgrade_timer_label: Label
+var tactical_upgrade_count_label: Label
+var tactical_upgrade_card_panels: Array[Panel] = []
+var tactical_upgrade_category_labels: Array[Label] = []
+var tactical_upgrade_name_labels: Array[Label] = []
+var tactical_upgrade_description_labels: Array[Label] = []
+var tactical_upgrade_buttons: Array[Button] = []
 
 
 func _ready() -> void:
@@ -176,15 +206,20 @@ func _process(delta: float) -> void:
 	if in_menu:
 		queue_redraw()
 		return
-
-	if paused:
+	if game_over or level_cleared:
+		_hide_tactical_upgrade_panel()
+		queue_redraw()
+		_update_ui()
+		return
+	if tactical_upgrade_active:
+		_update_tactical_upgrade_panel(delta)
 		_update_ui()
 		queue_redraw()
 		return
 
-	if game_over or level_cleared:
-		queue_redraw()
+	if paused:
 		_update_ui()
+		queue_redraw()
 		return
 
 	_update_food(delta)
@@ -208,6 +243,8 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if tactical_upgrade_active:
+		return
 	if not _is_assist_click_key(event):
 		return
 	if in_menu or paused or game_over or level_cleared:
@@ -219,6 +256,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if tactical_upgrade_active:
+		coin_sweep_active = false
+		return
 	if in_menu or paused or game_over or level_cleared:
 		coin_sweep_active = false
 		return
@@ -497,6 +537,145 @@ func _setup_ui() -> void:
 	_layout_top_hud()
 
 	_setup_main_menu()
+	_setup_tactical_upgrade_panel()
+
+
+func _setup_tactical_upgrade_panel() -> void:
+	tactical_upgrade_blocker = AquariumUIFactory.panel(Vector2.ZERO, VIEWPORT_SIZE, false)
+	tactical_upgrade_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+	var blocker_style := StyleBoxFlat.new()
+	blocker_style.bg_color = Color("020617", 0.76)
+	tactical_upgrade_blocker.add_theme_stylebox_override("panel", blocker_style)
+	hud_layer.add_child(tactical_upgrade_blocker)
+
+	tactical_upgrade_panel = AquariumUIFactory.panel(Vector2(96, 112), Vector2(1088, 496))
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color("06263a", 0.98)
+	panel_style.border_color = Color("67e8f9", 0.72)
+	panel_style.set_border_width_all(3)
+	panel_style.set_corner_radius_all(24)
+	panel_style.shadow_color = Color("020617", 0.72)
+	panel_style.shadow_size = 18
+	tactical_upgrade_panel.add_theme_stylebox_override("panel", panel_style)
+	tactical_upgrade_blocker.add_child(tactical_upgrade_panel)
+
+	var title := AquariumUIFactory.label(chinese_font, 30, "战术声呐 · 防线升级", Vector2(0, 28), Vector2(1088, 44), HORIZONTAL_ALIGNMENT_CENTER)
+	title.add_theme_color_override("font_color", Color("ecfeff"))
+	tactical_upgrade_panel.add_child(title)
+	var subtitle := AquariumUIFactory.label(chinese_font, 18, "防线暂稳，选择一项只在本局生效的战术协议", Vector2(0, 74), Vector2(1088, 30), HORIZONTAL_ALIGNMENT_CENTER)
+	subtitle.add_theme_color_override("font_color", Color("a5f3fc"))
+	tactical_upgrade_panel.add_child(subtitle)
+	tactical_upgrade_timer_label = AquariumUIFactory.label(chinese_font, 17, "", Vector2(404, 108), Vector2(280, 28), HORIZONTAL_ALIGNMENT_CENTER)
+	tactical_upgrade_timer_label.add_theme_color_override("font_color", Color("fde68a"))
+	tactical_upgrade_panel.add_child(tactical_upgrade_timer_label)
+
+	for index in range(UpgradeLogic.OFFER_COUNT):
+		var card := AquariumUIFactory.panel(Vector2(32 + index * 352, 142), Vector2(320, 244))
+		var card_style := StyleBoxFlat.new()
+		card_style.bg_color = Color("0c3b52", 0.9)
+		card_style.border_color = Color("7dd3fc", 0.34)
+		card_style.set_border_width_all(2)
+		card_style.set_corner_radius_all(18)
+		card.add_theme_stylebox_override("panel", card_style)
+		tactical_upgrade_card_panels.append(card)
+		tactical_upgrade_panel.add_child(card)
+
+		var category_label := AquariumUIFactory.label(chinese_font, 15, "", Vector2(16, 14), Vector2(288, 24), HORIZONTAL_ALIGNMENT_CENTER)
+		tactical_upgrade_category_labels.append(category_label)
+		card.add_child(category_label)
+		var name_label := AquariumUIFactory.label(chinese_font, 24, "", Vector2(16, 45), Vector2(288, 38), HORIZONTAL_ALIGNMENT_CENTER)
+		tactical_upgrade_name_labels.append(name_label)
+		card.add_child(name_label)
+		var description_label := AquariumUIFactory.label(chinese_font, 17, "", Vector2(20, 91), Vector2(280, 72), HORIZONTAL_ALIGNMENT_CENTER)
+		description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		description_label.add_theme_color_override("font_color", Color("dbeafe"))
+		tactical_upgrade_description_labels.append(description_label)
+		card.add_child(description_label)
+		var select_button := AquariumUIFactory.button(chinese_font, 18, "选择协议", Vector2(12, 174), Vector2(296, 56))
+		select_button.pressed.connect(_on_tactical_upgrade_selected.bind(index))
+		tactical_upgrade_buttons.append(select_button)
+		card.add_child(select_button)
+
+	tactical_upgrade_count_label = AquariumUIFactory.label(chinese_font, 16, "", Vector2(0, 416), Vector2(1088, 30), HORIZONTAL_ALIGNMENT_CENTER)
+	tactical_upgrade_count_label.add_theme_color_override("font_color", Color("bae6fd"))
+	tactical_upgrade_panel.add_child(tactical_upgrade_count_label)
+
+
+func _request_tactical_upgrade_if_available() -> void:
+	if tactical_upgrade_active or in_menu or paused or game_over or level_cleared:
+		return
+	if not UpgradeLogic.can_offer(UpgradeData.TACTICAL_UPGRADES, selected_tactical_upgrade_ids, tactical_upgrade_selection_count, tactical_upgrade_offer_count):
+		return
+	tactical_upgrade_offers = UpgradeLogic.create_offers(UpgradeData.TACTICAL_UPGRADES, selected_tactical_upgrade_ids)
+	if tactical_upgrade_offers.size() < UpgradeLogic.OFFER_COUNT:
+		tactical_upgrade_offers.clear()
+		return
+	tactical_upgrade_active = true
+	tactical_upgrade_offer_count += 1
+	tactical_upgrade_timer = TACTICAL_UPGRADE_TIMEOUT
+	screen_shake_time = 0.0
+	screen_shake_strength = 0.0
+	coin_sweep_active = false
+	for index in range(tactical_upgrade_buttons.size()):
+		var upgrade: Dictionary = tactical_upgrade_offers[index]
+		var accent := Color(str(upgrade.get("accent", "7dd3fc")))
+		tactical_upgrade_category_labels[index].text = str(upgrade.get("category", "战术协议"))
+		tactical_upgrade_category_labels[index].add_theme_color_override("font_color", accent)
+		tactical_upgrade_name_labels[index].text = str(upgrade.get("name", "未知升级"))
+		tactical_upgrade_name_labels[index].add_theme_color_override("font_color", accent.lightened(0.2))
+		tactical_upgrade_description_labels[index].text = str(upgrade.get("description", ""))
+		tactical_upgrade_buttons[index].text = "选择 · %s" % str(upgrade.get("name", "协议"))
+		tactical_upgrade_buttons[index].modulate = accent.lightened(0.18)
+	tactical_upgrade_blocker.visible = true
+	_update_tactical_upgrade_panel_text()
+
+
+func _update_tactical_upgrade_panel(delta: float) -> void:
+	tactical_upgrade_timer = max(0.0, tactical_upgrade_timer - delta)
+	_update_tactical_upgrade_panel_text()
+	if tactical_upgrade_timer <= 0.0:
+		_hide_tactical_upgrade_panel()
+
+
+func _update_tactical_upgrade_panel_text() -> void:
+	if tactical_upgrade_timer_label == null:
+		return
+	tactical_upgrade_timer_label.text = "自动继续：%d 秒" % int(ceil(tactical_upgrade_timer))
+	tactical_upgrade_count_label.text = "本局已选择：%d / %d · 超时不会消耗选择次数" % [tactical_upgrade_selection_count, UpgradeLogic.MAX_SELECTIONS]
+
+
+func _on_tactical_upgrade_selected(offer_index: int) -> void:
+	if not tactical_upgrade_active or offer_index < 0 or offer_index >= tactical_upgrade_offers.size():
+		return
+	var upgrade: Dictionary = tactical_upgrade_offers[offer_index]
+	var upgrade_id := str(upgrade.get("id", ""))
+	if not UpgradeLogic.can_select(upgrade_id, tactical_upgrade_offers, selected_tactical_upgrade_ids, tactical_upgrade_selection_count):
+		return
+	selected_tactical_upgrade_ids.append(upgrade_id)
+	tactical_upgrade_selection_count += 1
+	if upgrade_id == "emergency_supply":
+		_drop_emergency_food()
+	last_pet_unlock_message = "战术升级：%s 已在本局生效" % str(upgrade.get("name", "协议"))
+	pet_message_time = 4.0
+	_play_sfx("buy")
+	_hide_tactical_upgrade_panel()
+
+
+func _hide_tactical_upgrade_panel() -> void:
+	tactical_upgrade_active = false
+	tactical_upgrade_timer = 0.0
+	tactical_upgrade_offers.clear()
+	coin_sweep_active = false
+	if tactical_upgrade_blocker != null:
+		tactical_upgrade_blocker.visible = false
+
+
+func _reset_tactical_upgrade_run_state() -> void:
+	_hide_tactical_upgrade_panel()
+	tactical_upgrade_selection_count = 0
+	tactical_upgrade_offer_count = 0
+	selected_tactical_upgrade_ids.clear()
 
 
 func _setup_shop_panel() -> void:
@@ -720,6 +899,7 @@ func _start_level(level: int) -> void:
 	last_pet_unlock_message = ""
 	enemy_spawn_timer = config["enemy_timer"]
 	safe_reward_timer = 0.0
+	_reset_tactical_upgrade_run_state()
 	_reset_coin_combo()
 	fish_list.clear()
 	food_list.clear()
@@ -734,6 +914,13 @@ func _start_level(level: int) -> void:
 	run_enemies_defeated = 0
 	run_fish_lost = 0
 	run_money_earned = 0
+	run_coin_generated = 0
+	run_coin_collected = 0
+	run_coin_bonus = 0
+	run_coin_stolen = 0
+	run_coin_lost = 0
+	run_fish_starved = 0
+	run_fish_eaten = 0
 	run_fish_bought = 0
 	run_peak_fish_count = 0
 
@@ -767,6 +954,7 @@ func _show_main_menu() -> void:
 	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 	last_pet_unlock_message = ""
 	safe_reward_timer = 0.0
+	_reset_tactical_upgrade_run_state()
 	_reset_coin_combo()
 	fish_list.clear()
 	food_list.clear()
@@ -809,6 +997,7 @@ func _update_menu_ui() -> void:
 
 
 func _show_save_manager() -> void:
+	_reset_tactical_upgrade_run_state()
 	in_menu = true
 	top_bar.visible = false
 	menu_panel.visible = false
@@ -874,18 +1063,22 @@ func _drop_auto_food(drop_position: Vector2) -> void:
 
 
 func _spawn_coin(spawn_position: Vector2, value: int) -> void:
-	coin_list.append(ResourceLogic.create_coin(_clamp_to_play_rect(spawn_position, COIN_RADIUS), value))
-	run_money_earned += value
+	coin_list.append(ResourceLogic.create_coin(_clamp_to_play_rect(spawn_position, COIN_RADIUS), value, UpgradeLogic.coin_life_multiplier(selected_tactical_upgrade_ids)))
+	run_coin_generated += value
 
 
 func _coin_spawn_position_for_fish(fish: Dictionary) -> Vector2:
 	return _clamp_to_play_rect(ResourceLogic.coin_spawn_position_for_fish(fish), COIN_RADIUS)
 
 
-func _spawn_hit_effect(position: Vector2, defeated: bool) -> void:
-	hit_effects.append(EffectLogic.create_hit_effect(position, defeated))
+func _spawn_hit_effect(position: Vector2, defeated: bool, reward_value: int = 0) -> void:
+	hit_effects.append(EffectLogic.create_hit_effect(position, defeated, reward_value))
 	screen_shake_time = EffectLogic.shake_time_for_hit(defeated)
 	screen_shake_strength = EffectLogic.shake_strength_for_hit(defeated)
+
+
+func _spawn_loss_effect(position: Vector2, text: String, kind: String) -> void:
+	hit_effects.append(EffectLogic.create_loss_effect(position, text, kind))
 
 
 func _spawn_guard_effect(origin: Vector2, target: Vector2) -> void:
@@ -924,13 +1117,17 @@ func _update_fish(delta: float) -> void:
 		fish["hunger"] = fish["hunger"] - hunger_delta
 
 		if fish["hunger"] <= 0.0:
+			_spawn_loss_effect(fish["pos"], "饥饿死亡", "fish_loss")
 			fish_list.remove_at(index)
 			run_fish_lost += 1
+			run_fish_starved += 1
 			continue
 
 		var guard_enemy_index := _guard_enemy_target_index(fish, fish_config)
 		if guard_enemy_index >= 0:
 			_update_guard_fish_movement(fish, guard_enemy_index)
+		elif _try_update_fish_evasion(fish, fish_config):
+			pass
 		elif _try_update_fish_feeding(fish, fish_config):
 			pass
 		else:
@@ -961,7 +1158,23 @@ func _update_fish(delta: float) -> void:
 
 
 func _try_update_fish_feeding(fish: Dictionary, fish_config: Dictionary) -> bool:
-	return FishLogic.try_update_feeding(fish, fish_config, food_list, _find_nearest_food_index(fish["pos"]), FISH_RADIUS, FOOD_RADIUS)
+	return FishLogic.try_update_feeding(fish, fish_config, food_list, _find_nearest_food_index(fish["pos"]), FISH_RADIUS, FOOD_RADIUS, UpgradeLogic.growth_multiplier(selected_tactical_upgrade_ids))
+
+
+func _try_update_fish_evasion(fish: Dictionary, fish_config: Dictionary) -> bool:
+	var enemy_index := _find_nearest_enemy_index(fish["pos"], FISH_EVASION_RADIUS)
+	if enemy_index < 0:
+		return false
+	return FishLogic.try_update_evasion(
+		fish,
+		fish_config,
+		enemy_list[enemy_index]["pos"],
+		FISH_EVASION_RADIUS,
+		FISH_EVASION_FULL_STRENGTH_RADIUS,
+		FISH_EVASION_SPEED,
+		FISH_EVASION_MINIMUM_BLEND,
+		FISH_EVASION_MAXIMUM_BLEND
+	)
 
 
 func _guard_enemy_target_index(fish: Dictionary, fish_config: Dictionary) -> int:
@@ -969,7 +1182,7 @@ func _guard_enemy_target_index(fish: Dictionary, fish_config: Dictionary) -> int
 
 
 func _update_guard_fish_movement(fish: Dictionary, enemy_index: int) -> void:
-	FishLogic.update_guard_movement(fish, enemy_list[enemy_index]["pos"], GUARD_FISH_ATTACK_RANGE)
+	FishLogic.update_guard_movement(fish, enemy_list[enemy_index]["pos"], _guard_fish_attack_range())
 
 
 func _update_guard_fish(delta: float) -> void:
@@ -982,10 +1195,10 @@ func _update_guard_fish(delta: float) -> void:
 			continue
 		fish["guard_cooldown"] = max(0.0, float(fish.get("guard_cooldown", 0.0)) - delta)
 		if fish["guard_cooldown"] <= 0.0:
-			var target_index := _find_nearest_enemy_index(fish["pos"], GUARD_FISH_ATTACK_RANGE)
+			var target_index := _find_nearest_enemy_index(fish["pos"], _guard_fish_attack_range())
 			if target_index >= 0:
 				_guard_fish_attack(fish["pos"], target_index)
-				fish["guard_cooldown"] = GUARD_FISH_ATTACK_COOLDOWN
+				fish["guard_cooldown"] = _guard_fish_attack_cooldown()
 		fish_list[fish_index] = fish
 
 
@@ -1004,11 +1217,15 @@ func _update_coins(delta: float) -> void:
 		else:
 			ResourceLogic.update_coin(coin, delta)
 		if unlocked_cleaner_snail and ResourceLogic.should_collect_with_snail(coin, cleaner_snail_position, CLEANER_SNAIL_COLLECT_RADIUS):
-			money += coin["value"]
+			var collected_value := int(coin["value"])
+			money += collected_value
+			run_coin_collected += collected_value
+			run_money_earned += collected_value
 			coin_list.remove_at(index)
 			_play_sfx("coin")
 			continue
 		if ResourceLogic.should_remove_coin(coin, PLAY_RECT):
+			run_coin_lost += int(coin["value"])
 			coin_list.remove_at(index)
 		else:
 			coin_list[index] = coin
@@ -1082,8 +1299,15 @@ func _update_enemies(delta: float) -> void:
 			var target_fish := fish_list[target_index]
 			EnemyLogic.update_chase_fish(enemy, target_fish, delta)
 			if EnemyLogic.can_attack_fish(enemy, target_fish, ENEMY_RADIUS, FISH_RADIUS):
-				fish_list.remove_at(target_index)
-				run_fish_lost += 1
+				var fish_defeated := FishLogic.apply_enemy_damage(target_fish, 1)
+				if fish_defeated:
+					_spawn_loss_effect(target_fish["pos"], "被敌人吃掉", "fish_loss")
+					fish_list.remove_at(target_index)
+					run_fish_lost += 1
+					run_fish_eaten += 1
+				else:
+					fish_list[target_index] = target_fish
+					_spawn_loss_effect(target_fish["pos"], "护卫受击 %d / %d" % [int(target_fish["hp"]), int(target_fish["max_hp"])], "guard_hit")
 				EnemyLogic.reset_attack_cooldown(enemy)
 				_play_sfx("hit")
 		else:
@@ -1098,7 +1322,9 @@ func _update_thief_enemy(enemy: Dictionary, enemy_index: int, delta: float) -> b
 		var target_coin := coin_list[target_coin_index]
 		EnemyLogic.update_chase_coin(enemy, target_coin, delta)
 		if EnemyLogic.can_steal_coin(enemy, target_coin, ENEMY_RADIUS, COIN_RADIUS):
-			_spawn_hit_effect(target_coin["pos"], false)
+			var stolen_value := int(target_coin["value"])
+			run_coin_stolen += stolen_value
+			_spawn_loss_effect(target_coin["pos"], "被偷 -%d" % stolen_value, "coin_loss")
 			coin_list.remove_at(target_coin_index)
 			_play_sfx("hit")
 		enemy["pos"] = _clamp_to_play_rect(enemy["pos"], ENEMY_RADIUS)
@@ -1201,7 +1427,7 @@ func _try_start_coin_magnet(origin: Vector2) -> bool:
 	var started := false
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
-		if ResourceLogic.can_start_player_magnet(coin, origin, COIN_MAGNET_RADIUS):
+		if ResourceLogic.can_start_player_magnet(coin, origin, _coin_magnet_radius()):
 			ResourceLogic.start_player_magnet(coin, origin, COIN_MAGNET_DURATION)
 			coin_list[index] = coin
 			started = true
@@ -1214,9 +1440,10 @@ func _try_attack_enemy(click_position: Vector2) -> bool:
 		return false
 	var enemy := enemy_list[index]
 	if CombatLogic.apply_enemy_damage(enemy, 1):
+		var reward_value := _enemy_coin_reward(enemy)
 		run_enemies_defeated += 1
-		_spawn_hit_effect(enemy["pos"], true)
-		_spawn_coin(enemy["pos"], _enemy_coin_reward(enemy))
+		_spawn_hit_effect(enemy["pos"], true, reward_value)
+		_spawn_coin(enemy["pos"], reward_value)
 		enemy_list.remove_at(index)
 		_try_start_safe_reward_window()
 		_play_sfx("defeat")
@@ -1247,9 +1474,10 @@ func _guard_fish_attack(origin: Vector2, enemy_index: int) -> void:
 	var enemy := enemy_list[enemy_index]
 	_spawn_guard_effect(origin, enemy["pos"])
 	if CombatLogic.apply_enemy_damage(enemy, 1):
+		var reward_value := _enemy_coin_reward(enemy)
 		run_enemies_defeated += 1
-		_spawn_hit_effect(enemy["pos"], true)
-		_spawn_coin(enemy["pos"], _enemy_coin_reward(enemy))
+		_spawn_hit_effect(enemy["pos"], true, reward_value)
+		_spawn_coin(enemy["pos"], reward_value)
 		enemy_list.remove_at(enemy_index)
 		_try_start_safe_reward_window()
 		_play_sfx("defeat")
@@ -1263,9 +1491,10 @@ func _electric_jellyfish_attack(enemy_index: int) -> void:
 	var enemy := enemy_list[enemy_index]
 	_spawn_jellyfish_effect(ELECTRIC_JELLYFISH_HOME, enemy["pos"])
 	if CombatLogic.apply_enemy_damage(enemy, ELECTRIC_JELLYFISH_DAMAGE):
+		var reward_value := _enemy_coin_reward(enemy)
 		run_enemies_defeated += 1
-		_spawn_hit_effect(enemy["pos"], true)
-		_spawn_coin(enemy["pos"], _enemy_coin_reward(enemy))
+		_spawn_hit_effect(enemy["pos"], true, reward_value)
+		_spawn_coin(enemy["pos"], reward_value)
 		enemy_list.remove_at(enemy_index)
 		_try_start_safe_reward_window()
 		_play_sfx("defeat")
@@ -1310,9 +1539,11 @@ func _collect_player_coin(coin: Dictionary) -> void:
 	coin_combo_timer = COIN_COMBO_WINDOW
 	var base_value := int(coin["value"])
 	var collected_value := ComboLogic.collected_coin_value(base_value, coin_combo_count, COIN_COMBO_BONUS_PER_STEP, COIN_COMBO_MAX_MULTIPLIER)
+	var bonus_value := collected_value - base_value
 	money += collected_value
-	if collected_value > base_value:
-		run_money_earned += collected_value - base_value
+	run_coin_collected += base_value
+	run_coin_bonus += bonus_value
+	run_money_earned += collected_value
 
 
 func _reset_coin_combo() -> void:
@@ -1323,6 +1554,7 @@ func _reset_coin_combo() -> void:
 func _trigger_game_over() -> void:
 	if game_over:
 		return
+	_hide_tactical_upgrade_panel()
 	game_over = true
 	_reset_coin_combo()
 	_play_sfx("fail")
@@ -1348,7 +1580,19 @@ func _update_ui() -> void:
 	pause_button.disabled = view_model["pause_disabled"]
 	pause_button.text = view_model["pause_text"]
 	restart_button.text = view_model["restart_text"]
+	restart_button.disabled = false
 	menu_button.disabled = view_model["menu_disabled"]
+	if tactical_upgrade_active:
+		for fish_button in fish_buy_buttons:
+			fish_button.disabled = true
+		upgrade_food_button.disabled = true
+		buy_core_button.disabled = true
+		pause_button.disabled = true
+		restart_button.disabled = true
+		menu_button.disabled = true
+		audio_button.disabled = true
+	else:
+		audio_button.disabled = false
 
 
 func _hud_state() -> Dictionary:
@@ -1448,7 +1692,28 @@ func _try_start_safe_reward_window() -> void:
 		return
 	safe_reward_timer = SAFE_REWARD_TIME
 	warning_time = 0.0
+	if UpgradeLogic.should_drop_emergency_food(selected_tactical_upgrade_ids):
+		_drop_emergency_food()
+	_request_tactical_upgrade_if_available()
 	_play_sfx("coin")
+
+
+func _drop_emergency_food() -> void:
+	var drop_position := _random_play_position() + Vector2(0, -72)
+	food_list.append(ResourceLogic.create_food(_clamp_to_play_rect(drop_position, FOOD_RADIUS), 1))
+	_play_sfx("feed")
+
+
+func _coin_magnet_radius() -> float:
+	return COIN_MAGNET_RADIUS * UpgradeLogic.coin_magnet_multiplier(selected_tactical_upgrade_ids)
+
+
+func _guard_fish_attack_range() -> float:
+	return GUARD_FISH_ATTACK_RANGE * UpgradeLogic.guard_range_multiplier(selected_tactical_upgrade_ids)
+
+
+func _guard_fish_attack_cooldown() -> float:
+	return GUARD_FISH_ATTACK_COOLDOWN * UpgradeLogic.guard_cooldown_multiplier(selected_tactical_upgrade_ids)
 
 
 func _start_core_purchase_feedback(purchased_slot: int) -> void:
@@ -1652,6 +1917,8 @@ func _record_level_clear() -> void:
 
 
 func _on_buy_fish_type_pressed(fish_index: int) -> void:
+	if tactical_upgrade_active:
+		return
 	if fish_index < 0 or fish_index >= GameData.FISH_TYPES.size():
 		return
 	var fish_config: Dictionary = GameData.FISH_TYPES[fish_index]
@@ -1670,6 +1937,8 @@ func _on_buy_fish_pressed() -> void:
 
 
 func _on_upgrade_food_pressed() -> void:
+	if tactical_upgrade_active:
+		return
 	var cost := _food_upgrade_cost()
 	if not EconomyLogic.can_upgrade_food(money, food_level, cost, game_over, level_cleared):
 		return
@@ -1679,6 +1948,8 @@ func _on_upgrade_food_pressed() -> void:
 
 
 func _on_buy_core_pressed() -> void:
+	if tactical_upgrade_active:
+		return
 	var cost := _core_cost()
 	if money < cost or game_over or level_cleared:
 		return
@@ -1687,6 +1958,7 @@ func _on_buy_core_pressed() -> void:
 	_start_core_purchase_feedback(cores - 1)
 	_play_sfx("buy")
 	if ProgressionLogic.should_clear_level(cores):
+		_hide_tactical_upgrade_panel()
 		if ProgressionLogic.should_unlock_cleaner_snail(current_level, unlocked_cleaner_snail):
 			unlocked_cleaner_snail = true
 			pet_message_time = 6.0
@@ -1711,6 +1983,8 @@ func _on_buy_core_pressed() -> void:
 
 
 func _on_restart_pressed() -> void:
+	if tactical_upgrade_active:
+		return
 	_play_sfx("buy")
 	if level_cleared and current_level < MAX_LEVEL:
 		_start_level(current_level + 1)
@@ -1721,7 +1995,7 @@ func _on_restart_pressed() -> void:
 
 
 func _on_pause_pressed() -> void:
-	if in_menu or game_over or level_cleared:
+	if in_menu or tactical_upgrade_active or game_over or level_cleared:
 		return
 	paused = not paused
 	_play_sfx("buy")
@@ -1730,6 +2004,8 @@ func _on_pause_pressed() -> void:
 
 
 func _on_audio_toggle_pressed() -> void:
+	if tactical_upgrade_active:
+		return
 	audio_enabled = not audio_enabled
 	_update_audio_state()
 	if audio_enabled:
@@ -1737,6 +2013,8 @@ func _on_audio_toggle_pressed() -> void:
 
 
 func _on_menu_pressed() -> void:
+	if tactical_upgrade_active:
+		return
 	_play_sfx("buy")
 	_show_main_menu()
 
@@ -1893,6 +2171,10 @@ func _draw_fish() -> void:
 			hunger_color = Color("facc15")
 		draw_rect(Rect2(position + Vector2(-20, 23), Vector2(40, 6)), Color("0f172a", 0.65), true)
 		draw_rect(Rect2(position + Vector2(-18, 24), Vector2(36 * hunger_ratio, 4)), hunger_color, true)
+		if bool(fish_config.get("guard", false)):
+			var hp_ratio: float = clamp(float(fish.get("hp", 1)) / float(max(1, int(fish.get("max_hp", 1)))), 0.0, 1.0)
+			draw_rect(Rect2(position + Vector2(-20, 31), Vector2(40, 6)), Color("0f172a", 0.72), true)
+			draw_rect(Rect2(position + Vector2(-18, 32), Vector2(36 * hp_ratio, 4)), Color("34d399") if hp_ratio > 0.34 else Color("fb7185"), true)
 
 
 func _draw_food() -> void:
@@ -2084,18 +2366,22 @@ func _draw_hit_effects() -> void:
 		var progress: float = 1.0 - life / max_life
 		var alpha: float = clamp(life / max_life, 0.0, 1.0)
 		var defeated: bool = effect["defeated"]
-		var ring_color: Color = Color("ffd166", alpha) if defeated else Color("ffffff", alpha)
+		var kind := str(effect.get("kind", "hit"))
+		var base_color := Color("ffd166") if kind == "reward" else Color("fb7185") if kind == "fish_loss" else Color("f97316") if kind == "coin_loss" else Color.WHITE
+		var ring_color := Color(base_color, alpha)
 		draw_arc(position, 24.0 + progress * 34.0, 0.0, TAU, 28, ring_color, 4.0)
 		for i in range(8):
 			var angle: float = TAU * float(i) / 8.0 + progress * 0.9
 			var start: Vector2 = position + Vector2(cos(angle), sin(angle)) * (18.0 + progress * 12.0)
 			var end: Vector2 = position + Vector2(cos(angle), sin(angle)) * (34.0 + progress * 24.0)
 			draw_line(start, end, Color("fff7ad", alpha), 3.0 if defeated else 2.0)
-		var text_color: Color = Color("ffd166", alpha) if defeated else Color("ffffff", alpha)
-		draw_string(chinese_font, position + Vector2(-18, -46 - progress * 18.0), effect["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, 22 if defeated else 18, text_color)
+		var text_color := Color(base_color, alpha)
+		draw_string(chinese_font, position + Vector2(-110, -46 - progress * 18.0), effect["text"], HORIZONTAL_ALIGNMENT_CENTER, 220, 22 if defeated else 18, text_color)
 
 
 func _get_screen_shake_offset() -> Vector2:
+	if tactical_upgrade_active:
+		return Vector2.ZERO
 	if screen_shake_time <= 0.0 or screen_shake_strength <= 0.0:
 		return Vector2.ZERO
 	var shake := screen_shake_strength * (screen_shake_time / 0.16)
@@ -2155,10 +2441,10 @@ func _draw_result_panel(title: String, result_label: String, result_detail: Stri
 	var stats := [
 		"用时：%s" % _format_time(run_play_seconds),
 		"击败敌人：%d" % run_enemies_defeated,
-		"损失鱼：%d" % run_fish_lost,
-		"金币收入：%d" % run_money_earned,
+		"损失鱼：%d（饥饿 %d / 敌袭 %d）" % [run_fish_lost, run_fish_starved, run_fish_eaten],
+		"实际金币收入：%d（连击 +%d）" % [run_money_earned, run_coin_bonus],
+		"金币损失：被偷 %d / 沉没 %d" % [run_coin_stolen, run_coin_lost],
 		"购买鱼：%d" % run_fish_bought,
-		"最高鱼数：%d" % run_peak_fish_count,
 	]
 	var stats_rect := Rect2(Vector2(416, 292), Vector2(448, 188))
 	draw_rect(stats_rect, Color("0f2f45", 0.42), true)
