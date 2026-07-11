@@ -1,13 +1,25 @@
 extends RefCounted
 
 
-static func create_hit_effect(position: Vector2, defeated: bool) -> Dictionary:
+static func create_hit_effect(position: Vector2, defeated: bool, reward_value: int = 0) -> Dictionary:
 	return {
 		"pos": position,
 		"life": 0.36 if defeated else 0.24,
 		"max_life": 0.36 if defeated else 0.24,
 		"defeated": defeated,
-		"text": "+%d" % (40 if defeated else 1) if defeated else "-1",
+		"kind": "reward" if defeated else "hit",
+		"text": "掉落 %d" % reward_value if defeated else "-1",
+	}
+
+
+static func create_loss_effect(position: Vector2, text: String, kind: String) -> Dictionary:
+	return {
+		"pos": position,
+		"life": 0.5,
+		"max_life": 0.5,
+		"defeated": false,
+		"kind": kind,
+		"text": text,
 	}
 
 

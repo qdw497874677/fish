@@ -58,12 +58,12 @@ static func should_remove_food(food: Dictionary, play_rect: Rect2) -> bool:
 	return food["pos"].y > play_rect.end.y - 10.0 or food["life"] <= 0.0
 
 
-static func create_coin(spawn_position: Vector2, value: int) -> Dictionary:
+static func create_coin(spawn_position: Vector2, value: int, life_multiplier: float = 1.0) -> Dictionary:
 	return {
 		"pos": spawn_position,
 		"value": value,
 		"speed": 55.0,
-		"life": 9.0,
+		"life": 9.0 * life_multiplier,
 		"magnet_active": false,
 		"magnet_target": spawn_position,
 		"magnet_time": 0.0,
