@@ -69,6 +69,16 @@
       text-align: center;
       display: none;
     }
+
+    #build-version {
+      position: fixed;
+      right: 8px;
+      bottom: 6px;
+      z-index: 20;
+      color: rgba(230, 247, 255, 0.72);
+      font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -78,6 +88,7 @@
     <progress id="status-progress"></progress>
     <div id="status-notice"></div>
   </div>
+  <div id="build-version">build 20260711.3</div>
   <script src="godot.js"></script>
   <script>
     window.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -87,6 +98,7 @@
       args: [],
       canvasResizePolicy: 2,
       executable: "godot",
+      mainPack: "godot.pck?v=20260711.3",
       experimentalVK: false,
       fileSizes: {},
       focusCanvas: true,
