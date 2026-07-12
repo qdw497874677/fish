@@ -1,6 +1,7 @@
 extends Node2D
 
 const GameData := preload("res://scripts/data/game_data.gd")
+const GameplayTuning := preload("res://scripts/data/gameplay_tuning.gd")
 const UpgradeData := preload("res://scripts/data/upgrade_data.gd")
 const AudioSystem := preload("res://scripts/systems/audio_system.gd")
 const SaveSystem := preload("res://scripts/systems/save_system.gd")
@@ -1157,23 +1158,40 @@ func _update_fish(delta: float) -> void:
 		fish_list[index] = fish
 
 
-func _try_update_fish_feeding(fish: Dictionary, fish_config: Dictionary) -> bool:
-	return FishLogic.try_update_feeding(fish, fish_config, food_list, _find_nearest_food_index(fish["pos"]), FISH_RADIUS, FOOD_RADIUS, UpgradeLogic.growth_multiplier(selected_tactical_upgrade_ids))
+func _try_update_fish_feeding(fish_index: int, fish: Dictionary, fish_config: Dictionary, eligible_fish_indices: Array[int]) -> bool:
+	var target_food_index := _find_nearest_food_index(fish["pos"])
+	if target_food_index < 0:
+		return false
+	var claim_winner_index := AquariumQueries.feeding_claim_winner_index(target_food_index, fish_list, food_list, eligible_fish_indices, FISH_RADIUS + FOOD_RADIUS)
+	return FishLogic.try_update_feeding(fish, fish_config, food_list, target_food_index, fish_index, claim_winner_index, FISH_RADIUS, FOOD_RADIUS, UpgradeLogic.growth_multiplier(selected_tactical_upgrade_ids))
+
+
+func _feeding_eligible_fish_indices() -> Array[int]:
+	var eligible_indices: Array[int] = []
+	for fish_index in range(fish_list.size()):
+		var candidate: Dictionary = fish_list[fish_index]
+		var candidate_config := _fish_config(str(candidate.get("type", "blue")))
+		if _guard_enemy_target_index(candidate, candidate_config) >= 0:
+			continue
+		if not bool(candidate_config.get("guard", false)) and _find_nearest_enemy_index(candidate["pos"], GameplayTuning.FISH_EVASION_RADIUS) >= 0:
+			continue
+		eligible_indices.append(fish_index)
+	return eligible_indices
 
 
 func _try_update_fish_evasion(fish: Dictionary, fish_config: Dictionary) -> bool:
-	var enemy_index := _find_nearest_enemy_index(fish["pos"], FISH_EVASION_RADIUS)
+	var enemy_index := _find_nearest_enemy_index(fish["pos"], GameplayTuning.FISH_EVASION_RADIUS)
 	if enemy_index < 0:
 		return false
 	return FishLogic.try_update_evasion(
 		fish,
 		fish_config,
 		enemy_list[enemy_index]["pos"],
-		FISH_EVASION_RADIUS,
-		FISH_EVASION_FULL_STRENGTH_RADIUS,
-		FISH_EVASION_SPEED,
-		FISH_EVASION_MINIMUM_BLEND,
-		FISH_EVASION_MAXIMUM_BLEND
+		GameplayTuning.FISH_EVASION_RADIUS,
+		GameplayTuning.FISH_EVASION_FULL_STRENGTH_RADIUS,
+		GameplayTuning.FISH_EVASION_SPEED,
+		GameplayTuning.FISH_EVASION_MINIMUM_BLEND,
+		GameplayTuning.FISH_EVASION_MAXIMUM_BLEND
 	)
 
 
