@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameplayTuning := preload("res://scripts/data/gameplay_tuning.gd")
+
 
 static func enemy_hit_index(click_position: Vector2, enemy_list: Array[Dictionary], hit_radius: float) -> int:
 	for index in range(enemy_list.size() - 1, -1, -1):
@@ -20,6 +22,6 @@ static func is_enemy_defeated(enemy: Dictionary) -> bool:
 
 static func enemy_coin_reward(enemy: Dictionary) -> int:
 	var enemy_type := str(enemy.get("type", "tank" if enemy.get("tank", false) else "normal"))
-	if enemy_type == "thief":
-		return 30
-	return 35 if bool(enemy.get("tank", false)) else 22
+	if enemy_type == "thief" or enemy_type == "normal" or enemy_type == "tank":
+		return GameplayTuning.enemy_reward(enemy_type)
+	return GameplayTuning.enemy_reward("tank" if bool(enemy.get("tank", false)) else "normal")
