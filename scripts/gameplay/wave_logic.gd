@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameplayTuning := preload("res://scripts/data/gameplay_tuning.gd")
+
 
 static func tick_timer(value: float, delta: float) -> float:
 	return max(0.0, value - delta)
@@ -26,8 +28,8 @@ static func is_safe_reward_active(safe_reward_timer: float, game_over: bool, lev
 
 
 static func next_enemy_spawn_timer(base_timer: float) -> float:
-	var minimum_timer: float = max(3.0, base_timer * 0.9)
-	var maximum_timer: float = max(minimum_timer + 0.8, base_timer + 4.5)
+	var minimum_timer: float = max(GameplayTuning.ENEMY_WAVE_MINIMUM_SECONDS, base_timer * GameplayTuning.ENEMY_WAVE_BASE_MINIMUM_MULTIPLIER)
+	var maximum_timer: float = max(minimum_timer + GameplayTuning.ENEMY_WAVE_RANGE_PADDING, base_timer + GameplayTuning.ENEMY_WAVE_BASE_MAXIMUM_OFFSET)
 	return randf_range(minimum_timer, maximum_timer)
 
 
@@ -44,8 +46,8 @@ static func enemy_count_for_wave(level_config: Dictionary, active_enemy_count: i
 	return min(randi_range(minimum_count, maximum_count), available_slots)
 
 
-static func is_pre_invasion_warning_active(enemy_spawn_timer: float, warning_threshold: float, game_over: bool, level_cleared: bool) -> bool:
-	return enemy_spawn_timer > 0.0 and enemy_spawn_timer <= warning_threshold and not game_over and not level_cleared
+static func is_pre_invasion_warning_active(enemy_spawn_timer: float, game_over: bool, level_cleared: bool) -> bool:
+	return enemy_spawn_timer > 0.0 and enemy_spawn_timer <= GameplayTuning.PRE_INVASION_WARNING_TIME and not game_over and not level_cleared
 
 
 static func is_defense_pressure_active(enemy_count: int, game_over: bool, level_cleared: bool) -> bool:

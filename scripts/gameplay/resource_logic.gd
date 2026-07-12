@@ -1,12 +1,14 @@
 extends RefCounted
 
+const GameplayTuning := preload("res://scripts/data/gameplay_tuning.gd")
+
 
 static func create_food(drop_position: Vector2, food_level: int) -> Dictionary:
 	return {
 		"pos": drop_position,
 		"nutrition": float(food_level),
-		"speed": 82.0,
-		"life": 11.0,
+		"speed": GameplayTuning.FOOD_FALL_SPEED,
+		"life": GameplayTuning.FOOD_LIFETIME,
 	}
 
 
@@ -62,8 +64,8 @@ static func create_coin(spawn_position: Vector2, value: int, life_multiplier: fl
 	return {
 		"pos": spawn_position,
 		"value": value,
-		"speed": 55.0,
-		"life": 9.0 * life_multiplier,
+		"speed": GameplayTuning.COIN_FALL_SPEED,
+		"life": GameplayTuning.COIN_LIFETIME * life_multiplier,
 		"magnet_active": false,
 		"magnet_target": spawn_position,
 		"magnet_time": 0.0,

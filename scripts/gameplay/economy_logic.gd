@@ -1,12 +1,14 @@
 extends RefCounted
 
+const GameplayTuning := preload("res://scripts/data/gameplay_tuning.gd")
+
 
 static func food_drop_cost(food_level: int) -> int:
-	return 2 + food_level * 2
+	return GameplayTuning.FOOD_DROP_BASE_COST + food_level * GameplayTuning.FOOD_DROP_LEVEL_COST
 
 
 static func food_upgrade_cost(food_level: int) -> int:
-	return 120 + food_level * 80
+	return GameplayTuning.FOOD_UPGRADE_BASE_COST + food_level * GameplayTuning.FOOD_UPGRADE_LEVEL_COST
 
 
 static func core_cost(level_config: Dictionary, cores: int) -> int:
@@ -14,7 +16,7 @@ static func core_cost(level_config: Dictionary, cores: int) -> int:
 
 
 static func can_buy_core(money: int, core_cost_value: int, cores: int, paused: bool, game_over: bool, level_cleared: bool) -> bool:
-	return money >= core_cost_value and cores < 3 and not paused and not game_over and not level_cleared
+	return money >= core_cost_value and cores < GameplayTuning.CORE_GOAL and not paused and not game_over and not level_cleared
 
 
 static func minimum_fish_cost(fish_types: Array) -> int:
@@ -29,4 +31,4 @@ static func can_buy_fish(money: int, fish_config: Dictionary, game_over: bool, l
 
 
 static func can_upgrade_food(money: int, food_level: int, upgrade_cost: int, game_over: bool, level_cleared: bool) -> bool:
-	return money >= upgrade_cost and food_level < 3 and not game_over and not level_cleared
+	return money >= upgrade_cost and food_level < GameplayTuning.MAX_FOOD_LEVEL and not game_over and not level_cleared

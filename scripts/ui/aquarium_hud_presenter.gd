@@ -10,6 +10,7 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 	var level_cleared := bool(state["level_cleared"])
 	var current_level := int(state["current_level"])
 	var max_level := int(state["max_level"])
+	var core_goal := int(state["core_goal"])
 	var fish_count := int(state["fish_count"])
 	var enemy_count := int(state["enemy_count"])
 	var enemy_spawn_timer := float(state["enemy_spawn_timer"])
@@ -22,12 +23,15 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 	var defense_active := bool(state["defense_active"])
 	var safe_reward_active := bool(state["safe_reward_active"])
 	var safe_reward_timer := float(state["safe_reward_timer"])
+	var safe_reward_bonus_percent := int(state["safe_reward_bonus_percent"])
 	var coin_combo_count := int(state["coin_combo_count"])
 	var coin_combo_bonus_percent := int(state["coin_combo_bonus_percent"])
 	var next_action_text := str(state["next_action_text"])
 	var unlocked_cleaner_snail := bool(state["unlocked_cleaner_snail"])
 	var unlocked_bubble_seahorse := bool(state["unlocked_bubble_seahorse"])
 	var unlocked_electric_jellyfish := bool(state["unlocked_electric_jellyfish"])
+	var food_level_maxed := bool(state["food_level_maxed"])
+	var core_affordable := bool(state["core_affordable"])
 
 	var helper_text := "助手：%s %s %s" % ["螺✓" if unlocked_cleaner_snail else "螺-", "海马✓" if unlocked_bubble_seahorse else "海马-", "水母✓" if unlocked_electric_jellyfish else "水母-"]
 	var no_fish_text := ""
@@ -35,7 +39,7 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 		no_fish_text = "  无鱼倒计时：%ds" % int(ceil(max(0.0, no_fish_grace_time - no_fish_timer)))
 	var wave_text := "  安全奖励：%ds" % int(ceil(max(0.0, safe_reward_timer))) if safe_reward_active else ("  入侵预警：%ds" % int(ceil(max(0.0, enemy_spawn_timer))) if pre_invasion_active else "  下一波：%ds" % int(ceil(max(0.0, enemy_spawn_timer))))
 	var defense_text := "  防守期：饥饿减缓" if defense_active else ""
-	var safe_reward_text := "  成熟鱼金币 +20%" if safe_reward_active else ""
+	var safe_reward_text := "  成熟鱼金币 +%d%%" % safe_reward_bonus_percent if safe_reward_active else ""
 	var combo_text := "  收金币连击 x%d +%d%%" % [coin_combo_count, coin_combo_bonus_percent] if coin_combo_count >= 2 and coin_combo_bonus_percent > 0 else ""
 
 	var fish_buttons := []
@@ -48,12 +52,12 @@ static func build_view_model(state: Dictionary, fish_types: Array, level_config:
 
 	return {
 		"money_text": "金币：%d  食物 Lv.%d  用时：%s" % [money, food_level, format_time(total_play_seconds)],
-		"status_text": "第 %d/%d 关 %s  水晶：%d/3  鱼：%d  敌人：%d  %s%s%s%s%s%s" % [current_level, max_level, level_config["name"], cores, fish_count, enemy_count, helper_text, wave_text, defense_text, safe_reward_text, combo_text, no_fish_text],
+		"status_text": "第 %d/%d 关 %s  水晶：%d/%d  鱼：%d  敌人：%d  %s%s%s%s%s%s" % [current_level, max_level, level_config["name"], cores, core_goal, fish_count, enemy_count, helper_text, wave_text, defense_text, safe_reward_text, combo_text, no_fish_text],
 		"next_action_text": "提示：%s" % next_action_text if next_action_text != "" else "",
 		"fish_buttons": fish_buttons,
-		"upgrade_food_disabled": money < food_upgrade_cost or food_level >= 3 or paused or game_over or level_cleared,
-		"upgrade_food_text": "食物\n$%d" % food_upgrade_cost if food_level < 3 else "满级",
-		"core_affordable": money >= core_cost and cores < 3 and not paused and not game_over and not level_cleared,
+		"upgrade_food_disabled": money < food_upgrade_cost or food_level_maxed or paused or game_over or level_cleared,
+		"upgrade_food_text": "满级" if food_level_maxed else "食物\n$%d" % food_upgrade_cost,
+		"core_affordable": core_affordable,
 		"core_text": "水晶\n$%d" % core_cost,
 		"pause_disabled": game_over or level_cleared,
 		"pause_text": "继续" if paused else "暂停",

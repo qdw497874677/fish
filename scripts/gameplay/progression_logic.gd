@@ -1,10 +1,12 @@
 extends RefCounted
 
+const GameplayTuning := preload("res://scripts/data/gameplay_tuning.gd")
 
-static func should_fail_without_fish(fish_count: int, money: int, minimum_fish_cost: int, no_fish_timer: float, no_fish_grace_time: float) -> bool:
+
+static func should_fail_without_fish(fish_count: int, money: int, minimum_fish_cost: int, no_fish_timer: float) -> bool:
 	if fish_count > 0:
 		return false
-	return money < minimum_fish_cost or no_fish_timer >= no_fish_grace_time
+	return money < minimum_fish_cost or no_fish_timer >= GameplayTuning.NO_FISH_GRACE_TIME
 
 
 static func next_no_fish_timer(fish_count: int, no_fish_timer: float, delta: float) -> float:
@@ -13,26 +15,26 @@ static func next_no_fish_timer(fish_count: int, no_fish_timer: float, delta: flo
 	return no_fish_timer + delta
 
 
-static func unlocked_level_after_clear(current_level: int, highest_unlocked_level: int, max_level: int) -> int:
-	if current_level < max_level:
+static func unlocked_level_after_clear(current_level: int, highest_unlocked_level: int) -> int:
+	if current_level < GameplayTuning.MAX_LEVEL:
 		return max(highest_unlocked_level, current_level + 1)
 	return highest_unlocked_level
 
 
 static func should_unlock_cleaner_snail(current_level: int, unlocked_cleaner_snail: bool) -> bool:
-	return current_level == 1 and not unlocked_cleaner_snail
+	return current_level == GameplayTuning.CLEANER_SNAIL_UNLOCK_LEVEL and not unlocked_cleaner_snail
 
 
 static func should_unlock_bubble_seahorse(current_level: int, unlocked_bubble_seahorse: bool) -> bool:
-	return current_level == 2 and not unlocked_bubble_seahorse
+	return current_level == GameplayTuning.BUBBLE_SEAHORSE_UNLOCK_LEVEL and not unlocked_bubble_seahorse
 
 
-static func should_unlock_electric_jellyfish(current_level: int, max_level: int, unlocked_electric_jellyfish: bool) -> bool:
-	return current_level == 3 and not unlocked_electric_jellyfish
+static func should_unlock_electric_jellyfish(current_level: int, unlocked_electric_jellyfish: bool) -> bool:
+	return current_level == GameplayTuning.ELECTRIC_JELLYFISH_UNLOCK_LEVEL and not unlocked_electric_jellyfish
 
 
 static func should_clear_level(cores: int) -> bool:
-	return cores >= 3
+	return cores >= GameplayTuning.CORE_GOAL
 
 
 static func next_action_hint(state: Dictionary, level_config: Dictionary, minimum_fish_cost: int) -> String:
@@ -58,9 +60,9 @@ static func next_action_hint(state: Dictionary, level_config: Dictionary, minimu
 		return "敌人在场，先点击敌人；防守期鱼饥饿会减缓。"
 	if pre_invasion_active:
 		return "入侵预警中，先收金币并准备点击敌人。"
-	if cores < 3 and money >= core_cost:
+	if cores < GameplayTuning.CORE_GOAL and money >= core_cost:
 		return "金币足够，优先购买水晶核心推进通关。"
-	if cores < 3 and money >= int(float(core_cost) * 0.8):
+	if cores < GameplayTuning.CORE_GOAL and money >= int(float(core_cost) * GameplayTuning.CORE_NEAR_READY_RATIO):
 		return "快够买下一颗水晶了，继续收金币冲目标。"
 	if hungry_fish_count > 0 and food_count <= hungry_fish_count:
 		return "有鱼饿了，点击水体投喂让鱼继续成长产钱。"

@@ -24,49 +24,14 @@ const PLAY_RECT := Rect2(0, 96, 1280, 624)
 const FISH_RADIUS := 18.0
 const FOOD_RADIUS := 6.0
 const COIN_RADIUS := 11.0
-const COIN_SWEEP_RADIUS := 32.0
-const COIN_MAGNET_RADIUS := 104.0
-const COIN_MAGNET_PULL_SPEED := 420.0
-const COIN_MAGNET_COLLECT_RADIUS := 10.0
-const COIN_MAGNET_DURATION := 0.35
 const ENEMY_RADIUS := 24.0
-const FISH_SEPARATION_RADIUS := 58.0
-const FISH_SEPARATION_FORCE := 115.0
-const FISH_EVASION_RADIUS := 168.0
-const FISH_EVASION_FULL_STRENGTH_RADIUS := 88.0
-const FISH_EVASION_SPEED := 108.0
-const FISH_EVASION_MINIMUM_BLEND := 0.12
-const FISH_EVASION_MAXIMUM_BLEND := 0.28
-const GUARD_FISH_ATTACK_RANGE := 180.0
-const GUARD_FISH_ATTACK_COOLDOWN := 2.4
-const NO_FISH_GRACE_TIME := 12.0
-const PRE_INVASION_WARNING_TIME := 2.0
-const DEFENSE_HUNGER_MULTIPLIER := 0.5
-const SAFE_REWARD_TIME := 3.0
-const SAFE_REWARD_COIN_MULTIPLIER := 1.2
-const COIN_COMBO_WINDOW := 1.6
-const COIN_COMBO_MAX := 8
-const COIN_COMBO_BONUS_PER_STEP := 0.05
-const COIN_COMBO_MAX_MULTIPLIER := 1.4
 const MOBILE_TOUCH_HINT_TIME := 6.0
 const BEGINNER_COACH_TIME := 6.0
 const CORE_PURCHASE_FEEDBACK_TIME := 1.1
-const TACTICAL_UPGRADE_TIMEOUT := 10.0
-const MAX_LEVEL := 5
 const SAVE_SLOT_COUNT := SaveSystem.SAVE_SLOT_COUNT
 const CLEANER_SNAIL_HOME := Vector2(110, 672)
-const CLEANER_SNAIL_SPEED := 185.0
-const CLEANER_SNAIL_COLLECT_RADIUS := 28.0
 const BUBBLE_SEAHORSE_HOME := Vector2(1188, 188)
-const BUBBLE_SEAHORSE_SPEED := 220.0
-const BUBBLE_SEAHORSE_FEED_RADIUS := 34.0
-const BUBBLE_SEAHORSE_FEED_INTERVAL := 6.5
-const BUBBLE_SEAHORSE_HUNGER_THRESHOLD := 55.0
-const BUBBLE_SEAHORSE_MAX_FOOD := 3
 const ELECTRIC_JELLYFISH_HOME := Vector2(656, 170)
-const ELECTRIC_JELLYFISH_ATTACK_INTERVAL := 3.6
-const ELECTRIC_JELLYFISH_ATTACK_RANGE := 720.0
-const ELECTRIC_JELLYFISH_DAMAGE := 1
 const HUD_HEIGHT := 96.0
 const HUD_MARGIN := 18.0
 const HUD_GAP := 16.0
@@ -108,9 +73,9 @@ var save_slots: Array[Dictionary] = []
 var cleaner_snail_position := CLEANER_SNAIL_HOME
 var bubble_seahorse_position := BUBBLE_SEAHORSE_HOME
 var bubble_seahorse_target := BUBBLE_SEAHORSE_HOME
-var bubble_seahorse_timer := BUBBLE_SEAHORSE_FEED_INTERVAL
+var bubble_seahorse_timer := GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 var bubble_seahorse_pending_feed := false
-var electric_jellyfish_timer := ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+var electric_jellyfish_timer := GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 var pet_message_time := 0.0
 var last_pet_unlock_message := ""
 var screen_shake_time := 0.0
@@ -418,13 +383,13 @@ func _draw_core_progress_slots() -> void:
 	draw_rect(panel_rect, Color("042f3f", 0.62), true)
 	draw_rect(panel_rect, Color("7dd3fc", 0.25), false, 2.0)
 	draw_string(chinese_font, Vector2(panel_rect.position.x + 16, panel_rect.position.y + 36), "水晶核心", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("e0f2fe"))
-	for index in range(3):
+	for index in range(GameplayTuning.CORE_GOAL):
 		var slot_center := Vector2(panel_rect.position.x + 142 + index * 92, panel_rect.position.y + 29)
 		var slot_rect := Rect2(slot_center - Vector2(28, 22), Vector2(56, 44))
 		var purchased := index < cores
-		var next_slot := index == cores and cores < 3
+		var next_slot := index == cores and cores < GameplayTuning.CORE_GOAL
 		var next_cost := _core_cost()
-		var near_ready := next_slot and money >= int(next_cost * 0.8)
+		var near_ready := next_slot and money >= int(next_cost * GameplayTuning.CORE_NEAR_READY_RATIO)
 		var ready := next_slot and _can_buy_core()
 		var glow_alpha := 0.0
 		if purchased:
@@ -479,8 +444,8 @@ func _draw_core_purchase_feedback() -> void:
 		var start: Vector2 = center + direction * (20.0 + progress * 12.0)
 		var end: Vector2 = center + direction * (38.0 + progress * 18.0)
 		draw_line(start, end, Color("fff7ed", 0.8 * alpha), 2.0)
-	var label := "核心集齐！" if cores >= 3 else "水晶核心 +1"
-	var sub_label := "进度 %d/3" % clamp(cores, 0, 3)
+	var label := "核心集齐！" if cores >= GameplayTuning.CORE_GOAL else "水晶核心 +1"
+	var sub_label := "进度 %d/%d" % [clamp(cores, 0, GameplayTuning.CORE_GOAL), GameplayTuning.CORE_GOAL]
 	var text_origin := center + Vector2(-72, -48 - progress * 18.0)
 	draw_string(chinese_font, text_origin, label, HORIZONTAL_ALIGNMENT_CENTER, 144, 22, Color("fef3c7", alpha))
 	draw_string(chinese_font, text_origin + Vector2(0, 24), sub_label, HORIZONTAL_ALIGNMENT_CENTER, 144, 16, Color("bae6fd", 0.9 * alpha))
@@ -570,7 +535,7 @@ func _setup_tactical_upgrade_panel() -> void:
 	tactical_upgrade_timer_label.add_theme_color_override("font_color", Color("fde68a"))
 	tactical_upgrade_panel.add_child(tactical_upgrade_timer_label)
 
-	for index in range(UpgradeLogic.OFFER_COUNT):
+	for index in range(GameplayTuning.TACTICAL_UPGRADE_OFFER_COUNT):
 		var card := AquariumUIFactory.panel(Vector2(32 + index * 352, 142), Vector2(320, 244))
 		var card_style := StyleBoxFlat.new()
 		card_style.bg_color = Color("0c3b52", 0.9)
@@ -609,12 +574,12 @@ func _request_tactical_upgrade_if_available() -> void:
 	if not UpgradeLogic.can_offer(UpgradeData.TACTICAL_UPGRADES, selected_tactical_upgrade_ids, tactical_upgrade_selection_count, tactical_upgrade_offer_count):
 		return
 	tactical_upgrade_offers = UpgradeLogic.create_offers(UpgradeData.TACTICAL_UPGRADES, selected_tactical_upgrade_ids)
-	if tactical_upgrade_offers.size() < UpgradeLogic.OFFER_COUNT:
+	if tactical_upgrade_offers.size() < GameplayTuning.TACTICAL_UPGRADE_OFFER_COUNT:
 		tactical_upgrade_offers.clear()
 		return
 	tactical_upgrade_active = true
 	tactical_upgrade_offer_count += 1
-	tactical_upgrade_timer = TACTICAL_UPGRADE_TIMEOUT
+	tactical_upgrade_timer = GameplayTuning.TACTICAL_UPGRADE_TIMEOUT
 	screen_shake_time = 0.0
 	screen_shake_strength = 0.0
 	coin_sweep_active = false
@@ -643,7 +608,7 @@ func _update_tactical_upgrade_panel_text() -> void:
 	if tactical_upgrade_timer_label == null:
 		return
 	tactical_upgrade_timer_label.text = "自动继续：%d 秒" % int(ceil(tactical_upgrade_timer))
-	tactical_upgrade_count_label.text = "本局已选择：%d / %d · 超时不会消耗选择次数" % [tactical_upgrade_selection_count, UpgradeLogic.MAX_SELECTIONS]
+	tactical_upgrade_count_label.text = "本局已选择：%d / %d · 超时不会消耗选择次数" % [tactical_upgrade_selection_count, GameplayTuning.TACTICAL_UPGRADE_MAX_SELECTIONS]
 
 
 func _on_tactical_upgrade_selected(offer_index: int) -> void:
@@ -776,10 +741,10 @@ func _setup_main_menu() -> void:
 	var level_button_size := Vector2(188, 78)
 	var level_button_gap := Vector2(22, 8)
 	var level_grid_start_y := 306.0
-	for level in range(1, MAX_LEVEL + 1):
+	for level in range(1, GameplayTuning.MAX_LEVEL + 1):
 		var row: int = int((level - 1) / 3)
 		var column: int = (level - 1) % 3
-		var row_count: int = mini(3, MAX_LEVEL - row * 3)
+		var row_count: int = mini(3, GameplayTuning.MAX_LEVEL - row * 3)
 		var row_width: float = float(row_count) * level_button_size.x + float(row_count - 1) * level_button_gap.x
 		var level_button_x: float = (menu_panel.size.x - row_width) * 0.5 + float(column) * (level_button_size.x + level_button_gap.x)
 		var level_button_y: float = level_grid_start_y + float(row) * (level_button_size.y + level_button_gap.y)
@@ -894,9 +859,9 @@ func _start_level(level: int) -> void:
 	pet_message_time = 0.0
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
-	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 	bubble_seahorse_pending_feed = false
-	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	electric_jellyfish_timer = GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 	last_pet_unlock_message = ""
 	enemy_spawn_timer = config["enemy_timer"]
 	safe_reward_timer = 0.0
@@ -950,9 +915,9 @@ func _show_main_menu() -> void:
 	pet_message_time = 0.0
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
-	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 	bubble_seahorse_pending_feed = false
-	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	electric_jellyfish_timer = GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 	last_pet_unlock_message = ""
 	safe_reward_timer = 0.0
 	_reset_tactical_upgrade_run_state()
@@ -1020,7 +985,7 @@ func _update_save_manager(message := "") -> void:
 			slot_progress_labels[slot_index].text = "最高：第 %d 关\n通关：%d / %d\n用时：%s\n螺：%s 海马：%s 水母：%s" % [
 				int(slot.get("highest_unlocked_level", 1)),
 				_slot_cleared_count(slot),
-				MAX_LEVEL,
+		GameplayTuning.MAX_LEVEL,
 				_format_time(float(slot.get("total_play_seconds", 0.0))),
 				snail_text,
 				seahorse_text,
@@ -1114,33 +1079,36 @@ func _update_fish(delta: float) -> void:
 	var hunger_delta := delta * _hunger_drain_multiplier()
 	for index in range(fish_list.size() - 1, -1, -1):
 		var fish := fish_list[index]
-		var fish_config := _fish_config(str(fish.get("type", "blue")))
 		fish["hunger"] = fish["hunger"] - hunger_delta
-
 		if fish["hunger"] <= 0.0:
 			_spawn_loss_effect(fish["pos"], "饥饿死亡", "fish_loss")
 			fish_list.remove_at(index)
 			run_fish_lost += 1
 			run_fish_starved += 1
 			continue
+		fish_list[index] = fish
 
+	var feeding_eligible_fish_indices := _feeding_eligible_fish_indices()
+	for index in range(fish_list.size() - 1, -1, -1):
+		var fish := fish_list[index]
+		var fish_config := _fish_config(str(fish.get("type", "blue")))
 		var guard_enemy_index := _guard_enemy_target_index(fish, fish_config)
 		if guard_enemy_index >= 0:
 			_update_guard_fish_movement(fish, guard_enemy_index)
 		elif _try_update_fish_evasion(fish, fish_config):
 			pass
-		elif _try_update_fish_feeding(fish, fish_config):
+		elif _try_update_fish_feeding(index, fish, fish_config, feeding_eligible_fish_indices):
 			pass
 		else:
-			if fish["pos"].distance_to(fish["wander_target"]) < 24.0:
+			if fish["pos"].distance_to(fish["wander_target"]) < GameplayTuning.FISH_WANDER_ARRIVAL_RADIUS:
 				fish["wander_target"] = _random_play_position()
 			var wander_direction: Vector2 = (fish["wander_target"] - fish["pos"]).normalized()
-			fish["velocity"] = fish["velocity"].lerp(wander_direction * 72.0, 0.04)
+			fish["velocity"] = fish["velocity"].lerp(wander_direction * GameplayTuning.FISH_WANDER_SPEED, GameplayTuning.FISH_WANDER_BLEND)
 
 		var separation := _fish_separation_vector(index)
 		if separation != Vector2.ZERO:
-			fish["velocity"] = fish["velocity"] + separation * FISH_SEPARATION_FORCE * delta
-			fish["velocity"] = fish["velocity"].limit_length(145.0)
+			fish["velocity"] = fish["velocity"] + separation * GameplayTuning.FISH_SEPARATION_FORCE * delta
+			fish["velocity"] = fish["velocity"].limit_length(GameplayTuning.FISH_SEPARATION_SPEED_LIMIT)
 
 		var velocity: Vector2 = fish["velocity"]
 		if abs(velocity.x) > 8.0:
@@ -1224,8 +1192,8 @@ func _update_coins(delta: float) -> void:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
 		if bool(coin.get("magnet_active", false)):
-			ResourceLogic.update_magnetized_coin(coin, COIN_MAGNET_PULL_SPEED, delta)
-			if ResourceLogic.should_collect_magnetized_coin(coin, COIN_MAGNET_COLLECT_RADIUS):
+			ResourceLogic.update_magnetized_coin(coin, GameplayTuning.COIN_MAGNET_PULL_SPEED, delta)
+			if ResourceLogic.should_collect_magnetized_coin(coin, GameplayTuning.COIN_MAGNET_COLLECT_RADIUS):
 				_collect_player_coin(coin)
 				coin_list.remove_at(index)
 				_play_sfx("coin")
@@ -1234,7 +1202,7 @@ func _update_coins(delta: float) -> void:
 				ResourceLogic.cancel_magnet(coin)
 		else:
 			ResourceLogic.update_coin(coin, delta)
-		if unlocked_cleaner_snail and ResourceLogic.should_collect_with_snail(coin, cleaner_snail_position, CLEANER_SNAIL_COLLECT_RADIUS):
+		if unlocked_cleaner_snail and ResourceLogic.should_collect_with_snail(coin, cleaner_snail_position, GameplayTuning.CLEANER_SNAIL_COLLECT_RADIUS):
 			var collected_value := int(coin["value"])
 			money += collected_value
 			run_coin_collected += collected_value
@@ -1255,7 +1223,7 @@ func _update_cleaner_snail(delta: float) -> void:
 		return
 
 	var target := ResourceLogic.cleaner_snail_target(coin_list, CLEANER_SNAIL_HOME, cleaner_snail_position)
-	cleaner_snail_position = ResourceLogic.update_cleaner_snail_position(cleaner_snail_position, target, CLEANER_SNAIL_SPEED, delta)
+	cleaner_snail_position = ResourceLogic.update_cleaner_snail_position(cleaner_snail_position, target, GameplayTuning.CLEANER_SNAIL_SPEED, delta)
 	cleaner_snail_position = _clamp_to_play_rect(cleaner_snail_position, 22.0)
 
 
@@ -1263,27 +1231,27 @@ func _update_bubble_seahorse(delta: float) -> void:
 	if not unlocked_bubble_seahorse:
 		bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 		bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
-		bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+		bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 		bubble_seahorse_pending_feed = false
 		return
 
 	var target := bubble_seahorse_target if bubble_seahorse_pending_feed else BUBBLE_SEAHORSE_HOME
-	bubble_seahorse_position = ResourceLogic.update_bubble_seahorse_position(bubble_seahorse_position, target, BUBBLE_SEAHORSE_SPEED, delta)
+	bubble_seahorse_position = ResourceLogic.update_bubble_seahorse_position(bubble_seahorse_position, target, GameplayTuning.BUBBLE_SEAHORSE_SPEED, delta)
 	bubble_seahorse_position = _clamp_to_play_rect(bubble_seahorse_position, 24.0)
 
 	if bubble_seahorse_pending_feed:
-		if bubble_seahorse_position.distance_to(bubble_seahorse_target) > BUBBLE_SEAHORSE_FEED_RADIUS:
+		if bubble_seahorse_position.distance_to(bubble_seahorse_target) > GameplayTuning.BUBBLE_SEAHORSE_ARRIVAL_RADIUS:
 			return
 		_drop_auto_food(bubble_seahorse_target)
 		bubble_seahorse_pending_feed = false
-		bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+		bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 		return
 
 	bubble_seahorse_timer = max(0.0, bubble_seahorse_timer - delta)
 	if bubble_seahorse_timer > 0.0:
 		return
-	if not ResourceLogic.should_auto_feed_with_seahorse(fish_list, food_list.size(), BUBBLE_SEAHORSE_MAX_FOOD, BUBBLE_SEAHORSE_HUNGER_THRESHOLD):
-		bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	if not ResourceLogic.should_auto_feed_with_seahorse(fish_list, food_list.size(), GameplayTuning.BUBBLE_SEAHORSE_MAX_FOOD, GameplayTuning.SEAHORSE_AUTO_FEED_THRESHOLD_CURRENT):
+		bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 		return
 	bubble_seahorse_target = _clamp_to_play_rect(ResourceLogic.bubble_seahorse_feed_position(fish_list, bubble_seahorse_position), FOOD_RADIUS)
 	bubble_seahorse_pending_feed = true
@@ -1291,7 +1259,7 @@ func _update_bubble_seahorse(delta: float) -> void:
 
 func _update_electric_jellyfish(delta: float) -> void:
 	if not unlocked_electric_jellyfish:
-		electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+		electric_jellyfish_timer = GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 		return
 	if enemy_list.is_empty():
 		electric_jellyfish_timer = min(electric_jellyfish_timer, 0.8)
@@ -1299,8 +1267,8 @@ func _update_electric_jellyfish(delta: float) -> void:
 	electric_jellyfish_timer = max(0.0, electric_jellyfish_timer - delta)
 	if electric_jellyfish_timer > 0.0:
 		return
-	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
-	var target_index := ResourceLogic.electric_jellyfish_target_index(ELECTRIC_JELLYFISH_HOME, enemy_list, ELECTRIC_JELLYFISH_ATTACK_RANGE)
+	electric_jellyfish_timer = GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	var target_index := ResourceLogic.electric_jellyfish_target_index(ELECTRIC_JELLYFISH_HOME, enemy_list, GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_RANGE)
 	if target_index < 0:
 		return
 	_electric_jellyfish_attack(target_index)
@@ -1317,7 +1285,7 @@ func _update_enemies(delta: float) -> void:
 			var target_fish := fish_list[target_index]
 			EnemyLogic.update_chase_fish(enemy, target_fish, delta)
 			if EnemyLogic.can_attack_fish(enemy, target_fish, ENEMY_RADIUS, FISH_RADIUS):
-				var fish_defeated := FishLogic.apply_enemy_damage(target_fish, 1)
+				var fish_defeated := FishLogic.apply_enemy_damage(target_fish, GameplayTuning.ENEMY_FISH_DAMAGE)
 				if fish_defeated:
 					_spawn_loss_effect(target_fish["pos"], "被敌人吃掉", "fish_loss")
 					fish_list.remove_at(target_index)
@@ -1430,7 +1398,7 @@ func _try_sweep_collect_coin(sweep_position: Vector2) -> bool:
 	var collected := false
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
-		if ResourceLogic.should_collect_coin_at(coin, sweep_position, COIN_SWEEP_RADIUS):
+		if ResourceLogic.should_collect_coin_at(coin, sweep_position, GameplayTuning.COIN_SWEEP_RADIUS):
 			_collect_player_coin(coin)
 			coin_list.remove_at(index)
 			collected = true
@@ -1446,7 +1414,7 @@ func _try_start_coin_magnet(origin: Vector2) -> bool:
 	for index in range(coin_list.size() - 1, -1, -1):
 		var coin := coin_list[index]
 		if ResourceLogic.can_start_player_magnet(coin, origin, _coin_magnet_radius()):
-			ResourceLogic.start_player_magnet(coin, origin, COIN_MAGNET_DURATION)
+			ResourceLogic.start_player_magnet(coin, origin, GameplayTuning.COIN_MAGNET_DURATION)
 			coin_list[index] = coin
 			started = true
 	return started
@@ -1457,7 +1425,7 @@ func _try_attack_enemy(click_position: Vector2) -> bool:
 	if index < 0:
 		return false
 	var enemy := enemy_list[index]
-	if CombatLogic.apply_enemy_damage(enemy, 1):
+	if CombatLogic.apply_enemy_damage(enemy, GameplayTuning.PLAYER_CLICK_DAMAGE):
 		var reward_value := _enemy_coin_reward(enemy)
 		run_enemies_defeated += 1
 		_spawn_hit_effect(enemy["pos"], true, reward_value)
@@ -1491,7 +1459,7 @@ func _find_nearest_coin_index(origin: Vector2) -> int:
 func _guard_fish_attack(origin: Vector2, enemy_index: int) -> void:
 	var enemy := enemy_list[enemy_index]
 	_spawn_guard_effect(origin, enemy["pos"])
-	if CombatLogic.apply_enemy_damage(enemy, 1):
+	if CombatLogic.apply_enemy_damage(enemy, GameplayTuning.GUARD_ATTACK_DAMAGE):
 		var reward_value := _enemy_coin_reward(enemy)
 		run_enemies_defeated += 1
 		_spawn_hit_effect(enemy["pos"], true, reward_value)
@@ -1508,7 +1476,7 @@ func _guard_fish_attack(origin: Vector2, enemy_index: int) -> void:
 func _electric_jellyfish_attack(enemy_index: int) -> void:
 	var enemy := enemy_list[enemy_index]
 	_spawn_jellyfish_effect(ELECTRIC_JELLYFISH_HOME, enemy["pos"])
-	if CombatLogic.apply_enemy_damage(enemy, ELECTRIC_JELLYFISH_DAMAGE):
+	if CombatLogic.apply_enemy_damage(enemy, GameplayTuning.ELECTRIC_JELLYFISH_DAMAGE):
 		var reward_value := _enemy_coin_reward(enemy)
 		run_enemies_defeated += 1
 		_spawn_hit_effect(enemy["pos"], true, reward_value)
@@ -1523,7 +1491,7 @@ func _electric_jellyfish_attack(enemy_index: int) -> void:
 
 
 func _fish_separation_vector(fish_index: int) -> Vector2:
-	return AquariumQueries.fish_separation_vector(fish_index, fish_list, FISH_SEPARATION_RADIUS)
+	return AquariumQueries.fish_separation_vector(fish_index, fish_list, GameplayTuning.FISH_SEPARATION_RADIUS)
 
 
 func _random_play_position() -> Vector2:
@@ -1541,7 +1509,7 @@ func _update_play_time(delta: float) -> void:
 
 func _check_failure(delta: float) -> void:
 	no_fish_timer = ProgressionLogic.next_no_fish_timer(fish_list.size(), no_fish_timer, delta)
-	if ProgressionLogic.should_fail_without_fish(fish_list.size(), money, _minimum_fish_cost(), no_fish_timer, NO_FISH_GRACE_TIME):
+	if ProgressionLogic.should_fail_without_fish(fish_list.size(), money, _minimum_fish_cost(), no_fish_timer):
 		_trigger_game_over()
 		_save_progress()
 
@@ -1553,10 +1521,10 @@ func _update_coin_combo(delta: float) -> void:
 
 
 func _collect_player_coin(coin: Dictionary) -> void:
-	coin_combo_count = ComboLogic.advance_streak(coin_combo_count, COIN_COMBO_MAX)
-	coin_combo_timer = COIN_COMBO_WINDOW
+	coin_combo_count = ComboLogic.advance_streak(coin_combo_count)
+	coin_combo_timer = GameplayTuning.COIN_COMBO_WINDOW
 	var base_value := int(coin["value"])
-	var collected_value := ComboLogic.collected_coin_value(base_value, coin_combo_count, COIN_COMBO_BONUS_PER_STEP, COIN_COMBO_MAX_MULTIPLIER)
+	var collected_value := ComboLogic.collected_coin_value(base_value, coin_combo_count)
 	var bonus_value := collected_value - base_value
 	money += collected_value
 	run_coin_collected += base_value
@@ -1614,16 +1582,20 @@ func _update_ui() -> void:
 
 
 func _hud_state() -> Dictionary:
+	var hungry_fish_count := _hungry_fish_count()
+	var core_affordable := _can_buy_core()
+	var safe_reward_active := _is_safe_reward_active()
 	return {
 		"money": money,
 		"food_level": food_level,
 		"cores": cores,
 		"current_level": current_level,
-		"max_level": MAX_LEVEL,
+		"max_level": GameplayTuning.MAX_LEVEL,
+		"core_goal": GameplayTuning.CORE_GOAL,
 		"fish_count": fish_list.size(),
 		"food_count": food_list.size(),
 		"coin_count": coin_list.size(),
-		"hungry_fish_count": _hungry_fish_count(),
+		"hungry_fish_count": hungry_fish_count,
 		"enemy_count": enemy_list.size(),
 		"paused": paused,
 		"game_over": game_over,
@@ -1633,32 +1605,35 @@ func _hud_state() -> Dictionary:
 		"unlocked_electric_jellyfish": unlocked_electric_jellyfish,
 		"enemy_spawn_timer": enemy_spawn_timer,
 		"no_fish_timer": no_fish_timer,
-		"no_fish_grace_time": NO_FISH_GRACE_TIME,
+		"no_fish_grace_time": GameplayTuning.NO_FISH_GRACE_TIME,
 		"total_play_seconds": total_play_seconds,
 		"core_cost": _core_cost(),
 		"food_upgrade_cost": _food_upgrade_cost(),
+		"food_level_maxed": food_level >= GameplayTuning.MAX_FOOD_LEVEL,
+		"core_affordable": core_affordable,
 		"pre_invasion_active": _is_pre_invasion_warning_active(),
 		"defense_active": _is_defense_pressure_active(),
-		"safe_reward_active": _is_safe_reward_active(),
+		"safe_reward_active": safe_reward_active,
 		"safe_reward_timer": safe_reward_timer,
+		"safe_reward_bonus_percent": _safe_reward_bonus_percent(),
 		"coin_combo_count": coin_combo_count,
-		"coin_combo_bonus_percent": ComboLogic.bonus_percent(coin_combo_count, COIN_COMBO_BONUS_PER_STEP, COIN_COMBO_MAX_MULTIPLIER),
-		"next_action_text": ProgressionLogic.next_action_hint(_raw_hint_state(), _get_level_config(), _minimum_fish_cost()),
+		"coin_combo_bonus_percent": ComboLogic.bonus_percent(coin_combo_count),
+		"next_action_text": ProgressionLogic.next_action_hint(_raw_hint_state(hungry_fish_count, safe_reward_active), _get_level_config(), _minimum_fish_cost()),
 	}
 
 
-func _raw_hint_state() -> Dictionary:
+func _raw_hint_state(hungry_fish_count: int, safe_reward_active: bool) -> Dictionary:
 	return {
 		"money": money,
 		"cores": cores,
 		"fish_count": fish_list.size(),
 		"food_count": food_list.size(),
 		"coin_count": coin_list.size(),
-		"hungry_fish_count": _hungry_fish_count(),
+		"hungry_fish_count": hungry_fish_count,
 		"enemy_count": enemy_list.size(),
 		"core_cost": _core_cost(),
 		"pre_invasion_active": _is_pre_invasion_warning_active(),
-		"safe_reward_active": _is_safe_reward_active(),
+		"safe_reward_active": safe_reward_active,
 		"game_over": game_over,
 		"level_cleared": level_cleared,
 	}
@@ -1667,7 +1642,7 @@ func _raw_hint_state() -> Dictionary:
 func _hungry_fish_count() -> int:
 	var count := 0
 	for fish in fish_list:
-		if float(fish.get("hunger", 0.0)) <= 45.0:
+		if float(fish.get("hunger", 0.0)) <= GameplayTuning.HUD_HUNGRY_THRESHOLD_CURRENT:
 			count += 1
 	return count
 
@@ -1684,7 +1659,7 @@ func _is_pre_invasion_warning_active() -> bool:
 	var level_config: Dictionary = _get_level_config()
 	if not WaveLogic.has_enemy_capacity(level_config, enemy_list.size()):
 		return false
-	return WaveLogic.is_pre_invasion_warning_active(enemy_spawn_timer, PRE_INVASION_WARNING_TIME, game_over, level_cleared)
+	return WaveLogic.is_pre_invasion_warning_active(enemy_spawn_timer, game_over, level_cleared)
 
 
 func _is_defense_pressure_active() -> bool:
@@ -1696,19 +1671,23 @@ func _is_safe_reward_active() -> bool:
 
 
 func _hunger_drain_multiplier() -> float:
-	return DEFENSE_HUNGER_MULTIPLIER if _is_defense_pressure_active() or _is_safe_reward_active() else 1.0
+	return GameplayTuning.DEFENSE_HUNGER_MULTIPLIER if _is_defense_pressure_active() or _is_safe_reward_active() else 1.0
 
 
 func _safe_reward_coin_value(base_value: int) -> int:
 	if not _is_safe_reward_active():
 		return base_value
-	return int(ceil(float(base_value) * SAFE_REWARD_COIN_MULTIPLIER))
+	return int(ceil(float(base_value) * GameplayTuning.SAFE_REWARD_COIN_MULTIPLIER))
+
+
+func _safe_reward_bonus_percent() -> int:
+	return int(round((GameplayTuning.SAFE_REWARD_COIN_MULTIPLIER - 1.0) * 100.0))
 
 
 func _try_start_safe_reward_window() -> void:
 	if not WaveLogic.should_start_safe_reward(enemy_list.size(), game_over, level_cleared):
 		return
-	safe_reward_timer = SAFE_REWARD_TIME
+	safe_reward_timer = GameplayTuning.SAFE_REWARD_TIME
 	warning_time = 0.0
 	if UpgradeLogic.should_drop_emergency_food(selected_tactical_upgrade_ids):
 		_drop_emergency_food()
@@ -1723,19 +1702,19 @@ func _drop_emergency_food() -> void:
 
 
 func _coin_magnet_radius() -> float:
-	return COIN_MAGNET_RADIUS * UpgradeLogic.coin_magnet_multiplier(selected_tactical_upgrade_ids)
+	return GameplayTuning.COIN_MAGNET_RADIUS * UpgradeLogic.coin_magnet_multiplier(selected_tactical_upgrade_ids)
 
 
 func _guard_fish_attack_range() -> float:
-	return GUARD_FISH_ATTACK_RANGE * UpgradeLogic.guard_range_multiplier(selected_tactical_upgrade_ids)
+	return GameplayTuning.GUARD_ATTACK_RANGE * UpgradeLogic.guard_range_multiplier(selected_tactical_upgrade_ids)
 
 
 func _guard_fish_attack_cooldown() -> float:
-	return GUARD_FISH_ATTACK_COOLDOWN * UpgradeLogic.guard_cooldown_multiplier(selected_tactical_upgrade_ids)
+	return GameplayTuning.GUARD_ATTACK_COOLDOWN * UpgradeLogic.guard_cooldown_multiplier(selected_tactical_upgrade_ids)
 
 
 func _start_core_purchase_feedback(purchased_slot: int) -> void:
-	core_purchase_feedback_slot = clamp(purchased_slot, 0, 2)
+	core_purchase_feedback_slot = clamp(purchased_slot, 0, GameplayTuning.CORE_GOAL - 1)
 	core_purchase_feedback_time = CORE_PURCHASE_FEEDBACK_TIME
 
 
@@ -1851,7 +1830,7 @@ func _empty_slot() -> Dictionary:
 
 
 func _normalize_slot(raw_slot: Dictionary) -> Dictionary:
-	return SaveSystem.normalize_slot(raw_slot, MAX_LEVEL)
+	return SaveSystem.normalize_slot(raw_slot, GameplayTuning.MAX_LEVEL)
 
 
 func _reset_runtime_progress() -> void:
@@ -1863,9 +1842,9 @@ func _reset_runtime_progress() -> void:
 	cleaner_snail_position = CLEANER_SNAIL_HOME
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
-	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 	bubble_seahorse_pending_feed = false
-	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	electric_jellyfish_timer = GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 	total_play_seconds = 0.0
 	run_play_seconds = 0.0
 	no_fish_timer = 0.0
@@ -1884,15 +1863,15 @@ func _apply_slot_progress(slot_index: int) -> void:
 	var slot_levels: Variant = slot.get("cleared_levels", [])
 	if slot_levels is Array:
 		for level_value in slot_levels:
-			var level: int = clamp(int(level_value), 1, MAX_LEVEL)
+			var level: int = clamp(int(level_value), 1, GameplayTuning.MAX_LEVEL)
 			if not cleared_levels.has(level):
 				cleared_levels.append(level)
 	cleaner_snail_position = CLEANER_SNAIL_HOME
 	bubble_seahorse_position = BUBBLE_SEAHORSE_HOME
 	bubble_seahorse_target = BUBBLE_SEAHORSE_HOME
-	bubble_seahorse_timer = BUBBLE_SEAHORSE_FEED_INTERVAL
+	bubble_seahorse_timer = GameplayTuning.BUBBLE_SEAHORSE_FEED_INTERVAL
 	bubble_seahorse_pending_feed = false
-	electric_jellyfish_timer = ELECTRIC_JELLYFISH_ATTACK_INTERVAL
+	electric_jellyfish_timer = GameplayTuning.ELECTRIC_JELLYFISH_ATTACK_INTERVAL
 
 
 func _next_helper_unlock_text() -> String:
@@ -1930,7 +1909,7 @@ func _first_empty_slot_index() -> int:
 func _record_level_clear() -> void:
 	if not cleared_levels.has(current_level):
 		cleared_levels.append(current_level)
-	highest_unlocked_level = ProgressionLogic.unlocked_level_after_clear(current_level, highest_unlocked_level, MAX_LEVEL)
+	highest_unlocked_level = ProgressionLogic.unlocked_level_after_clear(current_level, highest_unlocked_level)
 	_save_progress()
 
 
@@ -1969,7 +1948,7 @@ func _on_buy_core_pressed() -> void:
 	if tactical_upgrade_active:
 		return
 	var cost := _core_cost()
-	if money < cost or game_over or level_cleared:
+	if not EconomyLogic.can_buy_core(money, cost, cores, paused, game_over, level_cleared):
 		return
 	money -= cost
 	cores += 1
@@ -1989,7 +1968,7 @@ func _on_buy_core_pressed() -> void:
 			bubble_seahorse_pending_feed = false
 			pet_message_time = 6.0
 			last_pet_unlock_message = "新助手解锁：泡泡海马会自动给饥饿鱼投喂"
-		if ProgressionLogic.should_unlock_electric_jellyfish(current_level, MAX_LEVEL, unlocked_electric_jellyfish):
+		if ProgressionLogic.should_unlock_electric_jellyfish(current_level, unlocked_electric_jellyfish):
 			unlocked_electric_jellyfish = true
 			electric_jellyfish_timer = 1.2
 			pet_message_time = 6.0
@@ -2004,9 +1983,9 @@ func _on_restart_pressed() -> void:
 	if tactical_upgrade_active:
 		return
 	_play_sfx("buy")
-	if level_cleared and current_level < MAX_LEVEL:
+	if level_cleared and current_level < GameplayTuning.MAX_LEVEL:
 		_start_level(current_level + 1)
-	elif level_cleared and current_level >= MAX_LEVEL:
+	elif level_cleared and current_level >= GameplayTuning.MAX_LEVEL:
 		_show_main_menu()
 	else:
 		_start_level(current_level)
@@ -2179,7 +2158,7 @@ func _draw_fish() -> void:
 			draw_line(position - forward * 4.0 * scale - up * 12.0 * scale, position + forward * 11.0 * scale - up * 12.0 * scale, Color("064e3b"), 3.0 * scale)
 		draw_circle(position + forward * 12.0 * scale - up * 5.0 * scale, 3.2 * scale, Color("06384a"))
 		draw_circle(position + forward * 13.0 * scale - up * 6.0 * scale, 1.0 * scale, Color.WHITE)
-		var hunger_ratio: float = clamp(fish["hunger"] / 32.0, 0.0, 1.0)
+		var hunger_ratio: float = clamp(fish["hunger"] / GameplayTuning.FISH_MAX_HUNGER, 0.0, 1.0)
 		var hunger_color := Color("22c55e")
 		if hunger_ratio < 0.2:
 			var flash := 0.65 + sin(Time.get_ticks_msec() / 90.0) * 0.35
@@ -2423,11 +2402,11 @@ func _draw_overlay_messages() -> void:
 		draw_rect(Rect2(Vector2(400, 132), Vector2(480, 72)), Color("064e3b", 0.68), true)
 		draw_rect(Rect2(Vector2(400, 132), Vector2(480, 72)), Color("86efac", 0.72), false, 3.0)
 		draw_string(chinese_font, Vector2(430, 174), "防守成功！安全奖励 %d 秒" % remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 27, Color("dcfce7"))
-		draw_string(chinese_font, Vector2(438, 198), "成熟鱼金币 +20%，下一波暂停倒计时", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("bbf7d0"))
+		draw_string(chinese_font, Vector2(438, 198), "成熟鱼金币 +%d%%，下一波暂停倒计时" % _safe_reward_bonus_percent(), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("bbf7d0"))
 	if pet_message_time > 0.0:
 		draw_string(chinese_font, Vector2(430, 175), last_pet_unlock_message, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("e9d5ff"))
 	if fish_list.is_empty() and not game_over and not level_cleared:
-		var remaining := int(ceil(max(0.0, NO_FISH_GRACE_TIME - no_fish_timer)))
+		var remaining := int(ceil(max(0.0, GameplayTuning.NO_FISH_GRACE_TIME - no_fish_timer)))
 		draw_rect(Rect2(Vector2(396, 198), Vector2(488, 96)), Color("3b0a0a", 0.74), true)
 		draw_rect(Rect2(Vector2(396, 198), Vector2(488, 96)), Color("fb7185", 0.8), false, 3.0)
 		draw_string(chinese_font, Vector2(462, 238), "鱼群断档！%d 秒内购买新鱼" % remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color.WHITE)
@@ -2437,8 +2416,8 @@ func _draw_overlay_messages() -> void:
 		_draw_result_panel("经营失败", "鱼群断档", "鱼群全灭，且金币不足购买新鱼", "点击顶部“重新开始”再试一次，或回到菜单选关", Color("fecaca"), false)
 	elif level_cleared:
 		draw_rect(Rect2(Vector2.ZERO, VIEWPORT_SIZE), Color(0, 0, 0, 0.35), true)
-		if current_level < MAX_LEVEL:
-			_draw_result_panel("通关！水晶核心已集齐", "通关达成", "水晶核心 3/3 · 新关卡与助手进度已保存", "点击顶部“下一关”继续，或回菜单查看已解锁关卡", Color("bbf7d0"), true)
+		if current_level < GameplayTuning.MAX_LEVEL:
+			_draw_result_panel("水晶核心已集齐", "通关达成", "水晶核心 %d/%d · 新关卡与助手进度已保存" % [cores, GameplayTuning.CORE_GOAL], "点击顶部“下一关”继续，或回菜单查看已解锁关卡", Color("bbf7d0"), true)
 		else:
 			_draw_result_panel("当前阶段全部通关", "守卫完成", "现有关卡全部通过 · 水族防线已稳定", "点击顶部“回菜单”查看存档，或重玩任意已解锁关卡", Color("bbf7d0"), true)
 
@@ -2454,8 +2433,8 @@ func _draw_result_panel(title: String, result_label: String, result_detail: Stri
 	draw_rect(Rect2(panel_rect.position + Vector2(202, 34), Vector2(168, 28)), badge_color, true)
 	draw_rect(Rect2(panel_rect.position + Vector2(202, 34), Vector2(168, 28)), accent, false, 2.0)
 	draw_string(chinese_font, Vector2(panel_rect.position.x + 202, panel_rect.position.y + 55), result_label, HORIZONTAL_ALIGNMENT_CENTER, 168, 18, Color.WHITE)
-	draw_string(chinese_font, Vector2(panel_rect.position.x, 238), title, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 34, Color.WHITE)
-	draw_string(chinese_font, Vector2(panel_rect.position.x, 266), result_detail, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 18, detail_color)
+	draw_string(chinese_font, Vector2(panel_rect.position.x, 292), title, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 34, Color.WHITE)
+	draw_string(chinese_font, Vector2(panel_rect.position.x, 320), result_detail, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 18, detail_color)
 	var stats := [
 		"用时：%s" % _format_time(run_play_seconds),
 		"击败敌人：%d" % run_enemies_defeated,
@@ -2464,14 +2443,14 @@ func _draw_result_panel(title: String, result_label: String, result_detail: Stri
 		"金币损失：被偷 %d / 沉没 %d" % [run_coin_stolen, run_coin_lost],
 		"购买鱼：%d" % run_fish_bought,
 	]
-	var stats_rect := Rect2(Vector2(416, 292), Vector2(448, 188))
+	var stats_rect := Rect2(Vector2(416, 334), Vector2(448, 166))
 	draw_rect(stats_rect, Color("0f2f45", 0.42), true)
 	draw_rect(stats_rect, Color("7dd3fc", 0.16), false, 2.0)
 	for index in range(stats.size()):
 		var stat_color := Color("fecaca") if not success and index == 2 and run_fish_lost > 0 else Color("dbeafe")
-		draw_circle(Vector2(438, 312 + index * 26), 3.5, accent)
-		draw_string(chinese_font, Vector2(454, 320 + index * 26), stats[index], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, stat_color)
-	draw_string(chinese_font, Vector2(panel_rect.position.x, 510), subtitle, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 21, Color("cbd5e1"))
+		draw_circle(Vector2(438, 353 + index * 24), 3.5, accent)
+		draw_string(chinese_font, Vector2(454, 361 + index * 24), stats[index], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, stat_color)
+	draw_string(chinese_font, Vector2(panel_rect.position.x, 526), subtitle, HORIZONTAL_ALIGNMENT_CENTER, panel_rect.size.x, 21, Color("cbd5e1"))
 
 
 func _draw_pause_overlay() -> void:
